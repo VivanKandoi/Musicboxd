@@ -184,3 +184,71 @@ export async function searchCatalog(q: string) {
   ]);
   return { albums, artists, users };
 }
+
+const albumSummarySelect = {
+  id: true,
+  title: true,
+  coverUrl: true,
+  releaseDate: true,
+  artist: { select: { name: true } },
+} as const;
+
+export async function getPersonWork(name: string) {
+  const [asPrimaryArtist, credits] = await Promise.all([
+    prisma.album.findMany({
+      where: { artist: { name } },
+      select: albumSummarySelect,
+      orderBy: { releaseDate: "asc" },
+    }),
+    prisma.credit.findMany({
+      where: { name },
+      select: { role: true, album: { select: albumSummarySelect } },
+      orderBy: { album: { releaseDate: "asc" } },
+    }),
+  ]);
+
+  type CreditedAlbum = (typeof credits)[number]["album"];
+  const creditsByRole = new Map<string, CreditedAlbum[]>();
+  for (const credit of credits) {
+    const list = creditsByRole.get(credit.role) ?? [];
+    if (!list.some((a) => a.id === credit.album.id)) {
+      list.push(credit.album);
+    }
+    creditsByRole.set(credit.role, list);
+  }
+
+  return {
+    name,
+    asPrimaryArtist,
+    creditsByRole: Array.from(creditsByRole.entries()).map(([role, albums]) => ({
+      role,
+      albums,
+    })),
+    hasAnyWork: asPrimaryArtist.length > 0 || credits.length > 0,
+  };
+}
+
+const followUserSelect = {
+  id: true,
+  username: true,
+  name: true,
+  avatarUrl: true,
+} as const;
+
+export async function getFollowers(userId: string) {
+  const rows = await prisma.follow.findMany({
+    where: { followingId: userId },
+    orderBy: { createdAt: "desc" },
+    select: { follower: { select: followUserSelect } },
+  });
+  return rows.map((r) => r.follower);
+}
+
+export async function getFollowing(userId: string) {
+  const rows = await prisma.follow.findMany({
+    where: { followerId: userId },
+    orderBy: { createdAt: "desc" },
+    select: { following: { select: followUserSelect } },
+  });
+  return rows.map((r) => r.following);
+}

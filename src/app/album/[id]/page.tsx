@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -56,7 +57,12 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
           <div>
             <h1 className="text-2xl font-semibold sm:text-3xl">{album.title}</h1>
             <p className="text-muted">
-              {album.artist.name}
+              <Link
+                href={`/people/${encodeURIComponent(album.artist.name)}`}
+                className="hover:text-accent hover:underline"
+              >
+                {album.artist.name}
+              </Link>
               {album.releaseDate &&
                 ` · ${new Date(album.releaseDate).getFullYear()}`}
             </p>
@@ -124,7 +130,12 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
           <ul className="flex flex-col gap-1.5">
             {album.credits.map((credit) => (
               <li key={credit.id} className="text-sm">
-                <span className="text-foreground">{credit.name}</span>{" "}
+                <Link
+                  href={`/people/${encodeURIComponent(credit.name)}`}
+                  className="text-foreground hover:text-accent hover:underline"
+                >
+                  {credit.name}
+                </Link>{" "}
                 <span className="text-muted">— {credit.role}</span>
               </li>
             ))}

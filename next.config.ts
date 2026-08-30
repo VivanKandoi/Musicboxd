@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "i.scdn.co" },
       { protocol: "https", hostname: "*.discogs.com" },
     ],
+    // Uploaded avatars are validated (type + size) at the upload boundary and
+    // are meant to render inline (profile pictures), not download as files.
+    contentDispositionType: "inline",
   },
 };
 

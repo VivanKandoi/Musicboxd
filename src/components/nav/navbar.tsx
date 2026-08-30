@@ -38,6 +38,12 @@ export async function Navbar() {
                 </span>
                 <span className="hidden sm:inline">{session.user.username}</span>
               </Link>
+              <Link
+                href="/settings"
+                className="hidden text-sm text-muted transition-colors hover:text-foreground sm:inline"
+              >
+                Settings
+              </Link>
               <LogoutButton />
             </>
           ) : (

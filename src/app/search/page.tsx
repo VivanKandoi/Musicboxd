@@ -1,10 +1,9 @@
 import Link from "next/link";
-import Image from "next/image";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { searchCatalog } from "@/lib/queries";
 import { AlbumCard } from "@/components/album-card";
-import { FollowButton } from "@/components/follow-button";
+import { UserListItem } from "@/components/user-list-item";
 
 export default async function SearchPage({
   searchParams,
@@ -53,43 +52,12 @@ export default async function SearchPage({
         ) : (
           <div className="flex flex-col gap-3">
             {users.map((user) => (
-              <div
+              <UserListItem
                 key={user.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3"
-              >
-                <Link
-                  href={`/u/${user.username}`}
-                  className="flex min-w-0 items-center gap-3"
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-2 text-sm font-medium uppercase text-accent ring-1 ring-border">
-                    {user.avatarUrl ? (
-                      <Image
-                        src={user.avatarUrl}
-                        alt={user.username}
-                        width={40}
-                        height={40}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      user.username.slice(0, 2)
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {user.name || user.username}
-                    </p>
-                    <p className="truncate text-xs text-muted">
-                      @{user.username}
-                    </p>
-                  </div>
-                </Link>
-                {session?.user && session.user.id !== user.id && (
-                  <FollowButton
-                    username={user.username}
-                    initiallyFollowing={followingIds.has(user.id)}
-                  />
-                )}
-              </div>
+                user={user}
+                showFollowButton={Boolean(session?.user && session.user.id !== user.id)}
+                isFollowing={followingIds.has(user.id)}
+              />
             ))}
           </div>
         )}

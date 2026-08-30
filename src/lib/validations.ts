@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { THEME_COLOR_IDS, THEME_MODES } from "@/lib/theme";
 
 export const signupSchema = z.object({
   username: z
@@ -37,4 +38,9 @@ export const profileSchema = z.object({
 
 export const fiveFavesSchema = z.object({
   albumIds: z.array(z.string().min(1)).max(5),
+});
+
+export const settingsSchema = z.object({
+  themeColor: z.enum(THEME_COLOR_IDS),
+  themeMode: z.enum(THEME_MODES),
 });

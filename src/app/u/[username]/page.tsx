@@ -64,6 +64,7 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
                 alt={user.username}
                 width={64}
                 height={64}
+                priority
                 className="h-full w-full rounded-full object-cover"
               />
             ) : (
@@ -75,25 +76,29 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
             <p className="text-sm text-muted">@{user.username}</p>
             {user.bio && <p className="mt-2 max-w-md text-sm text-foreground/90">{user.bio}</p>}
             <div className="mt-2 flex gap-4 text-sm text-muted">
-              <span>
+              <Link href={`/u/${user.username}/followers`} className="hover:text-foreground">
                 <span className="font-medium text-foreground">
                   {user._count.followers}
                 </span>{" "}
                 followers
-              </span>
-              <span>
+              </Link>
+              <Link href={`/u/${user.username}/following`} className="hover:text-foreground">
                 <span className="font-medium text-foreground">
                   {user._count.following}
                 </span>{" "}
                 following
-              </span>
+              </Link>
             </div>
           </div>
         </div>
 
         <div>
           {isOwnProfile ? (
-            <EditProfileForm initialName={user.name ?? ""} initialBio={user.bio ?? ""} />
+            <EditProfileForm
+              initialName={user.name ?? ""}
+              initialBio={user.bio ?? ""}
+              initialAvatarUrl={user.avatarUrl}
+            />
           ) : session?.user ? (
             <FollowButton username={user.username} initiallyFollowing={isFollowing} />
           ) : null}

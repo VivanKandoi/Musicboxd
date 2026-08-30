@@ -10,6 +10,17 @@
   --accent: #ef6351;
   --accent-foreground: #1a0d0a;
   --star: #f2b544;
+  color-scheme: dark;
+}
+
+:root[data-mode="light"] {
+  --background: #faf9f8;
+  --surface: #ffffff;
+  --surface-2: #f0efed;
+  --foreground: #17171b;
+  --muted: #6b6874;
+  --border: #e2e0dd;
+  color-scheme: light;
 }
 
 @theme inline {
@@ -26,10 +37,6 @@
   --font-mono: var(--font-geist-mono);
 }
 
-html {
-  color-scheme: dark;
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
@@ -38,9 +45,4 @@ body {
 ::selection {
   background: var(--accent);
   color: var(--accent-foreground);
-}
-
-input,
-textarea {
-  color-scheme: dark;
 }
