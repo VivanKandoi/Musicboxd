@@ -20,7 +20,7 @@ export function SearchBox() {
         type="search"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="Search albums or artists…"
+        placeholder="Search albums, artists, or users…"
         className="w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
       />
     </form>

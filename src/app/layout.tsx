@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "First Log — Log, rate, and discuss music",
+  title: "MusicBoxd — Log, rate, and discuss music",
   description:
     "A social music logging and discovery platform: log listens, rate albums, write reviews, and see what your friends are playing.",
 };

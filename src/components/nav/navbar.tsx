@@ -13,7 +13,7 @@ export async function Navbar() {
           href="/"
           className="shrink-0 text-lg font-semibold tracking-tight text-foreground"
         >
-          First <span className="text-accent">Log</span>
+          Music<span className="text-accent">Boxd</span>
         </Link>
 
         <div className="hidden flex-1 sm:block">

@@ -136,7 +136,7 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
       <section>
         <h2 className="mb-3 text-lg font-medium">Stats</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Albums logged" value={stats.totalLogs} />
+          <StatTile label="Logs" value={stats.totalLogs} />
           <StatTile label="Unique albums" value={stats.albumsLogged} />
           <StatTile
             label="Avg rating given"

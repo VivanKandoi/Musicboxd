@@ -155,9 +155,11 @@ export async function getAlbumReviews(albumId: string, viewerId: string | null) 
 }
 
 export async function searchCatalog(q: string) {
-  const [albums, artists] = await Promise.all([
+  const [albums, artists, users] = await Promise.all([
     prisma.album.findMany({
-      where: { title: { contains: q } },
+      where: {
+        OR: [{ title: { contains: q } }, { artist: { name: { contains: q } } }],
+      },
       take: 20,
       include: { artist: { select: { name: true } } },
     }),
@@ -166,6 +168,19 @@ export async function searchCatalog(q: string) {
       take: 20,
       include: { albums: { select: { id: true, title: true, coverUrl: true } } },
     }),
+    prisma.user.findMany({
+      where: {
+        OR: [{ username: { contains: q } }, { name: { contains: q } }],
+      },
+      take: 20,
+      select: {
+        id: true,
+        username: true,
+        name: true,
+        avatarUrl: true,
+        bio: true,
+      },
+    }),
   ]);
-  return { albums, artists };
+  return { albums, artists, users };
 }

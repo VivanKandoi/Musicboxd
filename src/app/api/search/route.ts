@@ -7,7 +7,9 @@ export async function GET(request: Request) {
   if (!q) return NextResponse.json({ albums: [] });
 
   const albums = await prisma.album.findMany({
-    where: { title: { contains: q } },
+    where: {
+      OR: [{ title: { contains: q } }, { artist: { name: { contains: q } } }],
+    },
     take: 10,
     include: { artist: { select: { name: true } } },
   });

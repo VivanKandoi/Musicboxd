@@ -19,7 +19,7 @@ export default async function HomePage() {
             <span className="text-accent">Build your taste.</span>
           </h1>
           <p className="max-w-xl text-muted">
-            First Log is a social home for music lovers — rate albums, write
+            MusicBoxd is a social home for music lovers — rate albums, write
             reviews, keep a listening diary, and see what your friends are
             playing.
           </p>
