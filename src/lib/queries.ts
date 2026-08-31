@@ -157,16 +157,14 @@ export async function getAlbumReviews(albumId: string, viewerId: string | null) 
 export async function searchCatalog(q: string) {
   const [albums, artists, users] = await Promise.all([
     prisma.album.findMany({
-      where: {
-        OR: [{ title: { contains: q } }, { artist: { name: { contains: q } } }],
-      },
+      where: { title: { contains: q } },
       take: 20,
       include: { artist: { select: { name: true } } },
     }),
     prisma.artist.findMany({
       where: { name: { contains: q } },
       take: 20,
-      include: { albums: { select: { id: true, title: true, coverUrl: true } } },
+      include: { _count: { select: { albums: true } } },
     }),
     prisma.user.findMany({
       where: {
@@ -251,4 +249,19 @@ export async function getFollowing(userId: string) {
     select: { following: { select: followUserSelect } },
   });
   return rows.map((r) => r.following);
+}
+
+export async function getArtistDetail(id: string) {
+  return prisma.artist.findUnique({
+    where: { id },
+    include: {
+      albums: {
+        orderBy: { releaseDate: "asc" },
+        include: {
+          tracks: { orderBy: { trackNumber: "asc" } },
+          _count: { select: { logs: true } },
+        },
+      },
+    },
+  });
 }

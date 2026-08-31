@@ -58,7 +58,7 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
             <h1 className="text-2xl font-semibold sm:text-3xl">{album.title}</h1>
             <p className="text-muted">
               <Link
-                href={`/people/${encodeURIComponent(album.artist.name)}`}
+                href={`/artist/${album.artistId}`}
                 className="hover:text-accent hover:underline"
               >
                 {album.artist.name}

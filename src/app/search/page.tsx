@@ -83,20 +83,17 @@ export default async function SearchPage({
         ) : (
           <div className="flex flex-col gap-3">
             {artists.map((artist) => (
-              <div key={artist.id}>
-                <p className="font-medium text-foreground">{artist.name}</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {artist.albums.map((album) => (
-                    <Link
-                      key={album.id}
-                      href={`/album/${album.id}`}
-                      className="rounded-full border border-border px-3 py-1 text-xs text-muted hover:border-accent hover:text-foreground"
-                    >
-                      {album.title}
-                    </Link>
-                  ))}
-                </div>
-              </div>
+              <Link
+                key={artist.id}
+                href={`/artist/${artist.id}`}
+                className="flex items-center justify-between rounded-lg border border-border bg-surface p-3 hover:border-accent"
+              >
+                <span className="font-medium text-foreground">{artist.name}</span>
+                <span className="text-xs text-muted">
+                  {artist._count.albums}{" "}
+                  {artist._count.albums === 1 ? "album" : "albums"}
+                </span>
+              </Link>
             ))}
           </div>
         )}

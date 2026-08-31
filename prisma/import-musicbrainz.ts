@@ -155,7 +155,10 @@ async function fetchCoverUrl(releaseId: string): Promise<string | null> {
       images?: { front?: boolean; image: string; thumbnails?: Record<string, string> }[];
     };
     const front = data.images?.find((img) => img.front) ?? data.images?.[0];
-    return front?.thumbnails?.["500"] ?? front?.image ?? null;
+    const url = front?.thumbnails?.["500"] ?? front?.image ?? null;
+    // The Internet Archive sometimes returns plain-http URLs; coverartarchive.org
+    // serves https fine and that's all next/image is allowlisted for.
+    return url?.replace(/^http:\/\//, "https://") ?? null;
   } catch {
     return null;
   }
