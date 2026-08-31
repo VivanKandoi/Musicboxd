@@ -16,7 +16,11 @@ export default async function ArtistPage({ params }: PageProps<"/artist/[id]">) 
   const artist = await getArtistDetail(id);
   if (!artist) notFound();
 
-  const trackCount = artist.albums.reduce((sum, album) => sum + album.tracks.length, 0);
+  const albums = artist.albums.filter((a) => a.releaseGroupType === "Album");
+  const singleReleases = artist.albums.filter((a) => a.releaseGroupType !== "Album");
+  const singleTracks = singleReleases.flatMap((release) =>
+    release.tracks.map((track) => ({ ...track, release }))
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -37,65 +41,50 @@ export default async function ArtistPage({ params }: PageProps<"/artist/[id]">) 
         <div>
           <h1 className="text-2xl font-semibold sm:text-3xl">{artist.name}</h1>
           <p className="text-sm text-muted">
-            {artist.albums.length} {artist.albums.length === 1 ? "album" : "albums"} ·{" "}
-            {trackCount} tracks
+            {albums.length} {albums.length === 1 ? "album" : "albums"}
+            {singleTracks.length > 0 &&
+              ` · ${singleTracks.length} single${singleTracks.length === 1 ? "" : "s"}`}
           </p>
         </div>
       </div>
 
       <section>
         <h2 className="mb-3 text-lg font-medium">Albums</h2>
-        {artist.albums.length === 0 ? (
+        {albums.length === 0 ? (
           <p className="text-sm text-muted">No albums in the catalog yet.</p>
         ) : (
           <div className="flex flex-wrap gap-4">
-            {artist.albums.map((album) => (
+            {albums.map((album) => (
               <AlbumCard key={album.id} album={{ ...album, artist }} />
             ))}
           </div>
         )}
       </section>
 
-      <section>
-        <h2 className="mb-3 text-lg font-medium">All Tracks</h2>
-        {trackCount === 0 ? (
-          <p className="text-sm text-muted">No tracks in the catalog yet.</p>
-        ) : (
-          <div className="flex flex-col">
-            {artist.albums.map((album) => (
-              <div key={album.id} className="border-b border-border py-3 last:border-0">
+      {singleTracks.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-lg font-medium">Singles &amp; Other Tracks</h2>
+          <p className="mb-2 text-xs text-muted">
+            Songs not part of an album — click through to log or rate them.
+          </p>
+          <ol className="flex flex-col">
+            {singleTracks.map((track) => (
+              <li
+                key={track.id}
+                className="flex justify-between border-b border-border py-2 text-sm last:border-0"
+              >
                 <Link
-                  href={`/album/${album.id}`}
-                  className="text-sm font-medium text-foreground hover:text-accent"
+                  href={`/album/${track.release.id}`}
+                  className="text-foreground hover:text-accent hover:underline"
                 >
-                  {album.title}
+                  {track.title}
                 </Link>
-                {album.releaseDate && (
-                  <span className="ml-2 text-xs text-muted">
-                    {new Date(album.releaseDate).getFullYear()}
-                  </span>
-                )}
-                <ol className="mt-2 flex flex-col gap-1">
-                  {album.tracks.map((track) => (
-                    <li
-                      key={track.id}
-                      className="flex justify-between text-sm text-foreground/90"
-                    >
-                      <span>
-                        <span className="mr-2 text-muted">{track.trackNumber}.</span>
-                        {track.title}
-                      </span>
-                      <span className="text-muted">
-                        {formatDuration(track.durationSec)}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
+                <span className="text-muted">{formatDuration(track.durationSec)}</span>
+              </li>
             ))}
-          </div>
-        )}
-      </section>
+          </ol>
+        </section>
+      )}
     </div>
   );
 }

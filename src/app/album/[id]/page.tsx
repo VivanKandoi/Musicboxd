@@ -7,10 +7,12 @@ import {
   getAlbumDetail,
   getAlbumRatingSummary,
   getAlbumReviews,
+  getAlbumTrackRatings,
 } from "@/lib/queries";
 import { StarRating } from "@/components/star-rating";
 import { LogForm } from "@/components/log-form";
 import { ActivityItem } from "@/components/activity-item";
+import { TrackRatingRow } from "@/components/track-rating-row";
 
 function formatDuration(sec: number | null) {
   if (!sec) return "";
@@ -25,9 +27,10 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
   const album = await getAlbumDetail(id);
   if (!album) notFound();
 
-  const [{ avgRating, ratingCount }, reviews] = await Promise.all([
+  const [{ avgRating, ratingCount }, reviews, trackRatings] = await Promise.all([
     getAlbumRatingSummary(id),
     getAlbumReviews(id, session?.user?.id ?? null),
+    getAlbumTrackRatings(id, session?.user?.id ?? null),
   ]);
 
   const hasLoggedBefore = session?.user
@@ -89,6 +92,17 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
             </span>
           </div>
 
+          {trackRatings.ratedTrackCount > 0 && (
+            <div className="flex items-center gap-2">
+              <StarRating value={trackRatings.albumTrackRating} readOnly size="sm" />
+              <span className="text-xs text-muted">
+                Track rating: {trackRatings.albumTrackRating?.toFixed(1)} (from{" "}
+                {trackRatings.ratedTrackCount} rated{" "}
+                {trackRatings.ratedTrackCount === 1 ? "song" : "songs"})
+              </span>
+            </div>
+          )}
+
           {session?.user ? (
             <div className="mt-2">
               <LogForm albumId={album.id} hasLoggedBefore={hasLoggedBefore} />
@@ -107,20 +121,19 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
       <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
         <section>
           <h2 className="mb-3 text-lg font-medium">Tracklist</h2>
-          <ol className="flex flex-col gap-1">
+          <ol className="flex flex-col">
             {album.tracks.map((track) => (
-              <li
+              <TrackRatingRow
                 key={track.id}
-                className="flex justify-between border-b border-border py-1.5 text-sm last:border-0"
-              >
-                <span className="text-foreground">
-                  <span className="mr-2 text-muted">{track.trackNumber}.</span>
-                  {track.title}
-                </span>
-                <span className="text-muted">
-                  {formatDuration(track.durationSec)}
-                </span>
-              </li>
+                trackId={track.id}
+                title={track.title}
+                trackNumber={track.trackNumber}
+                duration={formatDuration(track.durationSec)}
+                initialAvg={trackRatings.ratingByTrack[track.id]?.avg ?? null}
+                initialCount={trackRatings.ratingByTrack[track.id]?.count ?? 0}
+                initialMyRating={trackRatings.myRatingByTrack[track.id] ?? null}
+                isAuthenticated={Boolean(session?.user)}
+              />
             ))}
           </ol>
         </section>

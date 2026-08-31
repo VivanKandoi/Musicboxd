@@ -19,10 +19,11 @@ model User {
   themeMode    String   @default("dark")
   createdAt    DateTime @default(now())
 
-  logs      Log[]
-  comments  Comment[]
-  likes     Like[]
-  fiveFaves FiveFave[]
+  logs         Log[]
+  comments     Comment[]
+  likes        Like[]
+  fiveFaves    FiveFave[]
+  trackRatings TrackRating[]
 
   following Follow[] @relation("follower")
   followers Follow[] @relation("following")
@@ -66,16 +67,17 @@ model AlbumGenre {
 }
 
 model Album {
-  id            String    @id @default(cuid())
-  title         String
-  coverUrl      String?
-  releaseDate   DateTime?
-  artist        Artist    @relation(fields: [artistId], references: [id])
-  artistId      String
-  spotifyId     String?   @unique
-  discogsId     String?   @unique
-  musicbrainzId String?   @unique
-  createdAt     DateTime  @default(now())
+  id                String    @id @default(cuid())
+  title             String
+  coverUrl          String?
+  releaseDate       DateTime?
+  releaseGroupType  String    @default("Album")
+  artist            Artist    @relation(fields: [artistId], references: [id])
+  artistId          String
+  spotifyId         String?   @unique
+  discogsId         String?   @unique
+  musicbrainzId     String?   @unique
+  createdAt         DateTime  @default(now())
 
   tracks    Track[]
   credits   Credit[]
@@ -96,8 +98,24 @@ model Track {
   album         Album   @relation(fields: [albumId], references: [id], onDelete: Cascade)
   albumId       String
 
+  ratings TrackRating[]
+
   @@index([albumId])
   @@index([musicbrainzId])
+}
+
+model TrackRating {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  trackId   String
+  rating    Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, trackId])
+  @@index([trackId])
 }
 
 model Credit {

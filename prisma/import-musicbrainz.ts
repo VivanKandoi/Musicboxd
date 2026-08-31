@@ -7,6 +7,7 @@ const MB_BASE = "https://musicbrainz.org/ws/2";
 const CAA_BASE = "https://coverartarchive.org";
 const MB_DELAY_MS = 1100;
 const MAX_ALBUMS_PER_ARTIST = 8;
+const MAX_SINGLES_PER_ARTIST = 6;
 
 // Diverse curated list spanning genres. Names already in the mock seed are
 // included too, so this import enriches/merges those existing rows with
@@ -195,6 +196,7 @@ async function upsertAlbum(params: {
   musicbrainzId: string;
   releaseDate: Date | null;
   coverUrl: string | null;
+  releaseGroupType: string;
 }) {
   const existingByMbid = await prisma.album.findUnique({
     where: { musicbrainzId: params.musicbrainzId },
@@ -211,6 +213,7 @@ async function upsertAlbum(params: {
         musicbrainzId: params.musicbrainzId,
         coverUrl: existingByTitle.coverUrl ?? params.coverUrl,
         releaseDate: existingByTitle.releaseDate ?? params.releaseDate,
+        releaseGroupType: params.releaseGroupType,
       },
     });
   }
@@ -222,6 +225,7 @@ async function upsertAlbum(params: {
       musicbrainzId: params.musicbrainzId,
       releaseDate: params.releaseDate,
       coverUrl: params.coverUrl,
+      releaseGroupType: params.releaseGroupType,
     },
   });
 }
@@ -295,6 +299,59 @@ function normalizeName(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+async function importReleaseGroup(
+  rg: MBReleaseGroup,
+  artist: { id: string; name: string },
+  mbArtist: MBArtist,
+  releaseGroupType: string
+) {
+  const existing = await prisma.album.findUnique({
+    where: { musicbrainzId: rg.id },
+    select: { _count: { select: { tracks: true, credits: true } } },
+  });
+  if (existing && existing._count.tracks > 0 && existing._count.credits > 0) {
+    console.log(`  - [${releaseGroupType}] ${rg.title} (already imported, skipping)`);
+    return;
+  }
+
+  console.log(`  - [${releaseGroupType}] ${rg.title}`);
+  const releasesResult = await mbFetch<{ releases: MBRelease[] }>(
+    `/release?release-group=${rg.id}&fmt=json&limit=25`
+  );
+  const releases = releasesResult?.releases ?? [];
+  const chosen =
+    releases.find((r) => r.status === "Official" && r["cover-art-archive"]?.front) ??
+    releases.find((r) => r.status === "Official") ??
+    releases[0];
+  if (!chosen) {
+    console.warn(`    No release found, skipping`);
+    return;
+  }
+
+  const detail = await mbFetch<MBReleaseDetail>(
+    `/release/${chosen.id}?inc=recordings+artist-credits+artist-rels&fmt=json`
+  );
+  if (!detail) return;
+
+  const coverUrl = chosen["cover-art-archive"]?.front
+    ? await fetchCoverUrl(chosen.id)
+    : null;
+
+  const releaseDate = rg["first-release-date"] ? new Date(rg["first-release-date"]) : null;
+
+  const album = await upsertAlbum({
+    artistId: artist.id,
+    title: rg.title,
+    musicbrainzId: rg.id,
+    releaseDate: releaseDate && !isNaN(releaseDate.getTime()) ? releaseDate : null,
+    coverUrl,
+    releaseGroupType,
+  });
+
+  await importTracksAndCredits(album.id, detail, artist.name);
+  await importGenres(album.id, mbArtist.tags ?? []);
+}
+
 async function importArtistAlbums(artistName: string) {
   console.log(`\n=== ${artistName} ===`);
   const searchResult = await mbFetch<{ artists: MBArtist[] }>(
@@ -315,54 +372,31 @@ async function importArtistAlbums(artistName: string) {
 
   const artist = await upsertArtist(mbArtist);
 
-  const rgResult = await mbFetch<{ "release-groups": MBReleaseGroup[] }>(
+  const albumRgResult = await mbFetch<{ "release-groups": MBReleaseGroup[] }>(
     `/release-group?artist=${mbArtist.id}&type=album&fmt=json&limit=100`
   );
-  const releaseGroups = (rgResult?.["release-groups"] ?? [])
+  const albumGroups = (albumRgResult?.["release-groups"] ?? [])
     .filter((rg) => !rg["secondary-types"]?.length)
     .sort((a, b) =>
       (a["first-release-date"] ?? "9999").localeCompare(b["first-release-date"] ?? "9999")
     )
     .slice(0, MAX_ALBUMS_PER_ARTIST);
 
-  for (const rg of releaseGroups) {
-    console.log(`  - ${rg.title}`);
-    const releasesResult = await mbFetch<{ releases: MBRelease[] }>(
-      `/release?release-group=${rg.id}&fmt=json&limit=25`
-    );
-    const releases = releasesResult?.releases ?? [];
-    const chosen =
-      releases.find((r) => r.status === "Official" && r["cover-art-archive"]?.front) ??
-      releases.find((r) => r.status === "Official") ??
-      releases[0];
-    if (!chosen) {
-      console.warn(`    No release found, skipping`);
-      continue;
-    }
+  for (const rg of albumGroups) {
+    await importReleaseGroup(rg, artist, mbArtist, "Album");
+  }
 
-    const detail = await mbFetch<MBReleaseDetail>(
-      `/release/${chosen.id}?inc=recordings+artist-credits+artist-rels&fmt=json`
-    );
-    if (!detail) continue;
+  const singleRgResult = await mbFetch<{ "release-groups": MBReleaseGroup[] }>(
+    `/release-group?artist=${mbArtist.id}&type=single&fmt=json&limit=100`
+  );
+  const singleGroups = (singleRgResult?.["release-groups"] ?? [])
+    .sort((a, b) =>
+      (b["first-release-date"] ?? "0000").localeCompare(a["first-release-date"] ?? "0000")
+    )
+    .slice(0, MAX_SINGLES_PER_ARTIST);
 
-    const coverUrl = chosen["cover-art-archive"]?.front
-      ? await fetchCoverUrl(chosen.id)
-      : null;
-
-    const releaseDate = rg["first-release-date"]
-      ? new Date(rg["first-release-date"])
-      : null;
-
-    const album = await upsertAlbum({
-      artistId: artist.id,
-      title: rg.title,
-      musicbrainzId: rg.id,
-      releaseDate: releaseDate && !isNaN(releaseDate.getTime()) ? releaseDate : null,
-      coverUrl,
-    });
-
-    await importTracksAndCredits(album.id, detail, artist.name);
-    await importGenres(album.id, mbArtist.tags ?? []);
+  for (const rg of singleGroups) {
+    await importReleaseGroup(rg, artist, mbArtist, "Single");
   }
 }
 

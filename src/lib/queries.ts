@@ -135,6 +135,51 @@ export async function getAlbumDetail(id: string) {
   });
 }
 
+export async function getAlbumTrackRatings(albumId: string, viewerId: string | null) {
+  const trackRows = await prisma.track.findMany({
+    where: { albumId },
+    select: { id: true },
+  });
+  const trackIds = trackRows.map((t) => t.id);
+
+  const grouped = await prisma.trackRating.groupBy({
+    by: ["trackId"],
+    where: { trackId: { in: trackIds } },
+    _avg: { rating: true },
+    _count: { rating: true },
+  });
+
+  const myRatings = viewerId
+    ? await prisma.trackRating.findMany({
+        where: { userId: viewerId, trackId: { in: trackIds } },
+        select: { trackId: true, rating: true },
+      })
+    : [];
+
+  const myRatingByTrack: Record<string, number> = {};
+  for (const r of myRatings) myRatingByTrack[r.trackId] = r.rating;
+
+  const ratingByTrack: Record<string, { avg: number; count: number }> = {};
+  for (const g of grouped) {
+    ratingByTrack[g.trackId] = { avg: g._avg.rating ?? 0, count: g._count.rating };
+  }
+
+  // Album's track-based rating: the average of each rated track's average
+  // rating, skipping tracks nobody has rated - recomputed live on every
+  // request so it always reflects the current ratings.
+  const ratedAverages = Object.values(ratingByTrack).map((v) => v.avg);
+  const albumTrackRating = ratedAverages.length
+    ? ratedAverages.reduce((a, b) => a + b, 0) / ratedAverages.length
+    : null;
+
+  return {
+    ratingByTrack,
+    myRatingByTrack,
+    albumTrackRating,
+    ratedTrackCount: ratedAverages.length,
+  };
+}
+
 export async function getAlbumRatingSummary(albumId: string) {
   const agg = await prisma.log.aggregate({
     where: { albumId, rating: { not: null } },
