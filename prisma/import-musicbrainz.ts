@@ -58,6 +58,10 @@ const ARTISTS = [
   "Bad Bunny",
   "Rosalía",
   "Bob Marley & The Wailers",
+  "Dolly Parton",
+  "The Cure",
+  "BTS",
+  "Stevie Wonder",
 ];
 
 type MBArtist = {
@@ -105,12 +109,27 @@ async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function mbFetch<T>(path: string, retries = 3): Promise<T | null> {
+async function mbFetch<T>(path: string, retries = 5): Promise<T | null> {
   const url = `${MB_BASE}${path}`;
   for (let attempt = 1; attempt <= retries; attempt++) {
-    const res = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-    });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: {
+          "User-Agent": USER_AGENT,
+          Accept: "application/json",
+          Connection: "close",
+        },
+      });
+    } catch (err) {
+      console.warn(
+        `  Network error on attempt ${attempt}/${retries} for ${path}: ${
+          (err as Error).message
+        }`
+      );
+      await sleep(3000 * attempt);
+      continue;
+    }
     await sleep(MB_DELAY_MS);
     if (res.ok) {
       return (await res.json()) as T;
@@ -269,14 +288,25 @@ async function importTracksAndCredits(
   }
 }
 
+function normalizeName(s: string) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
 async function importArtistAlbums(artistName: string) {
   console.log(`\n=== ${artistName} ===`);
   const searchResult = await mbFetch<{ artists: MBArtist[] }>(
-    `/artist?query=${encodeURIComponent(`artist:${artistName}`)}&fmt=json&limit=1`
+    `/artist?query=${encodeURIComponent(`artist:${artistName}`)}&fmt=json&limit=5`
   );
-  const mbArtist = searchResult?.artists?.[0];
+  const candidates = searchResult?.artists ?? [];
+  const wanted = normalizeName(artistName);
+  const mbArtist =
+    candidates.find((a) => normalizeName(a.name) === wanted) ?? null;
   if (!mbArtist) {
-    console.warn(`  No MusicBrainz artist found for "${artistName}"`);
+    console.warn(
+      `  No confident MusicBrainz match for "${artistName}" (top candidate: ${
+        candidates[0]?.name ?? "none"
+      }), skipping`
+    );
     return;
   }
 

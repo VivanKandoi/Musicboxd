@@ -92,11 +92,12 @@ model Track {
   title         String
   trackNumber   Int
   durationSec   Int?
-  musicbrainzId String? @unique
+  musicbrainzId String?
   album         Album   @relation(fields: [albumId], references: [id], onDelete: Cascade)
   albumId       String
 
   @@index([albumId])
+  @@index([musicbrainzId])
 }
 
 model Credit {
