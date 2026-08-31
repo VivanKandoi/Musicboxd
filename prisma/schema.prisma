@@ -41,12 +41,13 @@ model Follow {
 }
 
 model Artist {
-  id        String  @id @default(cuid())
-  name      String
-  imageUrl  String?
-  spotifyId String? @unique
-  discogsId String? @unique
-  albums    Album[]
+  id             String  @id @default(cuid())
+  name           String
+  imageUrl       String?
+  spotifyId      String? @unique
+  discogsId      String? @unique
+  musicbrainzId  String? @unique
+  albums         Album[]
 }
 
 model Genre {
@@ -65,15 +66,16 @@ model AlbumGenre {
 }
 
 model Album {
-  id          String    @id @default(cuid())
-  title       String
-  coverUrl    String?
-  releaseDate DateTime?
-  artist      Artist    @relation(fields: [artistId], references: [id])
-  artistId    String
-  spotifyId   String?   @unique
-  discogsId   String?   @unique
-  createdAt   DateTime  @default(now())
+  id            String    @id @default(cuid())
+  title         String
+  coverUrl      String?
+  releaseDate   DateTime?
+  artist        Artist    @relation(fields: [artistId], references: [id])
+  artistId      String
+  spotifyId     String?   @unique
+  discogsId     String?   @unique
+  musicbrainzId String?   @unique
+  createdAt     DateTime  @default(now())
 
   tracks    Track[]
   credits   Credit[]
@@ -86,12 +88,13 @@ model Album {
 }
 
 model Track {
-  id          String  @id @default(cuid())
-  title       String
-  trackNumber Int
-  durationSec Int?
-  album       Album   @relation(fields: [albumId], references: [id], onDelete: Cascade)
-  albumId     String
+  id            String  @id @default(cuid())
+  title         String
+  trackNumber   Int
+  durationSec   Int?
+  musicbrainzId String? @unique
+  album         Album   @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  albumId       String
 
   @@index([albumId])
 }

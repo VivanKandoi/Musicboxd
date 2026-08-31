@@ -10,7 +10,8 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:import-musicbrainz": "tsx prisma/import-musicbrainz.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
