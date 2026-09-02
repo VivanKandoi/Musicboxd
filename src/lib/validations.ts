@@ -44,3 +44,7 @@ export const settingsSchema = z.object({
   themeColor: z.enum(THEME_COLOR_IDS),
   themeMode: z.enum(THEME_MODES),
 });
+
+export const trackRatingSchema = z.object({
+  rating: z.number().min(0.5).max(5).multipleOf(0.5).nullable(),
+});

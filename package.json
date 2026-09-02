@@ -10,12 +10,14 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:import-musicbrainz": "tsx prisma/import-musicbrainz.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.4.0",
+    "lucide-react": "^1.39.0",
     "next": "16.3.3",
     "next-auth": "^5.0.0-beta.32",
     "prisma": "^6.19.3",

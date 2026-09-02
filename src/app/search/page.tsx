@@ -39,68 +39,67 @@ export default async function SearchPage({
       )
     : new Set<string>();
 
+  const hasArtistMatch = artists.length > 0;
+
   return (
     <div className="flex flex-col gap-8">
       <h1 className="text-2xl font-semibold">
         Results for &ldquo;{query}&rdquo;
       </h1>
 
-      <section>
-        <h2 className="mb-3 text-lg font-medium">People</h2>
-        {users.length === 0 ? (
-          <p className="text-sm text-muted">No users found.</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {users.map((user) => (
-              <UserListItem
-                key={user.id}
-                user={user}
-                showFollowButton={Boolean(session?.user && session.user.id !== user.id)}
-                isFollowing={followingIds.has(user.id)}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-lg font-medium">Albums</h2>
-        {albums.length === 0 ? (
-          <p className="text-sm text-muted">No albums found.</p>
-        ) : (
-          <div className="flex flex-wrap gap-4">
-            {albums.map((album) => (
-              <AlbumCard key={album.id} album={album} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-lg font-medium">Artists</h2>
-        {artists.length === 0 ? (
-          <p className="text-sm text-muted">No artists found.</p>
-        ) : (
+      {hasArtistMatch ? (
+        <section>
+          <h2 className="mb-3 text-lg font-medium">Artists</h2>
           <div className="flex flex-col gap-3">
             {artists.map((artist) => (
-              <div key={artist.id}>
-                <p className="font-medium text-foreground">{artist.name}</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {artist.albums.map((album) => (
-                    <Link
-                      key={album.id}
-                      href={`/album/${album.id}`}
-                      className="rounded-full border border-border px-3 py-1 text-xs text-muted hover:border-accent hover:text-foreground"
-                    >
-                      {album.title}
-                    </Link>
-                  ))}
-                </div>
-              </div>
+              <Link
+                key={artist.id}
+                href={`/artist/${artist.id}`}
+                className="flex items-center justify-between rounded-lg border border-border bg-surface p-3 hover:border-accent"
+              >
+                <span className="font-medium text-foreground">{artist.name}</span>
+                <span className="text-xs text-muted">
+                  {artist._count.albums}{" "}
+                  {artist._count.albums === 1 ? "album" : "albums"}
+                </span>
+              </Link>
             ))}
           </div>
-        )}
-      </section>
+        </section>
+      ) : (
+        <>
+          <section>
+            <h2 className="mb-3 text-lg font-medium">People</h2>
+            {users.length === 0 ? (
+              <p className="text-sm text-muted">No users found.</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {users.map((user) => (
+                  <UserListItem
+                    key={user.id}
+                    user={user}
+                    showFollowButton={Boolean(session?.user && session.user.id !== user.id)}
+                    isFollowing={followingIds.has(user.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section>
+            <h2 className="mb-3 text-lg font-medium">Albums</h2>
+            {albums.length === 0 ? (
+              <p className="text-sm text-muted">No albums found.</p>
+            ) : (
+              <div className="flex flex-wrap gap-4">
+                {albums.map((album) => (
+                  <AlbumCard key={album.id} album={album} />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }

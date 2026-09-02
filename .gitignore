@@ -49,3 +49,6 @@ prisma/dev.db-journal
 # user-uploaded content
 /public/uploads/*
 !/public/uploads/.gitkeep
+
+# local Claude Code tooling config (not part of the app)
+/.claude/

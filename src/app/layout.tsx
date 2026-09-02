@@ -33,7 +33,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     : null;
 
   const mode = prefs?.themeMode === "light" ? "light" : "dark";
-  const color = getThemeColor(prefs?.themeColor ?? "coral");
+  const color = getThemeColor(prefs?.themeColor ?? "amber");
 
   return (
     <html

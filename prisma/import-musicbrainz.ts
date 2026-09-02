@@ -1,0 +1,545 @@
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+const USER_AGENT = "MusicBoxd/1.0 (https://github.com/VivanKandoi)";
+const MB_BASE = "https://musicbrainz.org/ws/2";
+const CAA_BASE = "https://coverartarchive.org";
+const MB_DELAY_MS = 1100;
+const MAX_ALBUMS_PER_ARTIST = 8;
+const MAX_SINGLES_PER_ARTIST = 6;
+
+// Diverse curated list spanning genres. Names already in the mock seed are
+// included too, so this import enriches/merges those existing rows with
+// real MusicBrainz data instead of duplicating them.
+const ARTISTS = [
+  "Radiohead",
+  "Fleetwood Mac",
+  "Kendrick Lamar",
+  "Lana Del Rey",
+  "Frank Ocean",
+  "Daft Punk",
+  "Joni Mitchell",
+  "Arctic Monkeys",
+  "The Strokes",
+  "Pink Floyd",
+  "Nirvana",
+  "The Beatles",
+  "Led Zeppelin",
+  "Tame Impala",
+  "The National",
+  "J. Cole",
+  "Tyler, The Creator",
+  "Kanye West",
+  "Nas",
+  "OutKast",
+  "A Tribe Called Quest",
+  "Travis Scott",
+  "Taylor Swift",
+  "Billie Eilish",
+  "Dua Lipa",
+  "Michael Jackson",
+  "SZA",
+  "Erykah Badu",
+  "D'Angelo",
+  "Amy Winehouse",
+  "Sade",
+  "Aphex Twin",
+  "Bonobo",
+  "Four Tet",
+  "Bon Iver",
+  "Sufjan Stevens",
+  "Fleet Foxes",
+  "Metallica",
+  "Black Sabbath",
+  "The Clash",
+  "Rage Against the Machine",
+  "Miles Davis",
+  "John Coltrane",
+  "Bad Bunny",
+  "Rosalía",
+  "Bob Marley & The Wailers",
+  "Dolly Parton",
+  "The Cure",
+  "BTS",
+  "Stevie Wonder",
+  "The Rolling Stones",
+  "Queen",
+  "David Bowie",
+  "Talking Heads",
+  "R.E.M.",
+  "Pixies",
+  "Sonic Youth",
+  "The Smiths",
+  "Joy Division",
+  "New Order",
+  "Pavement",
+  "Wilco",
+  "LCD Soundsystem",
+  "Vampire Weekend",
+  "Interpol",
+  "The White Stripes",
+  "Foo Fighters",
+  "Pearl Jam",
+  "Soundgarden",
+  "Red Hot Chili Peppers",
+  "Weezer",
+  "Oasis",
+  "Blur",
+  "Jay-Z",
+  "The Notorious B.I.G.",
+  "2Pac",
+  "Wu-Tang Clan",
+  "MF DOOM",
+  "Common",
+  "Mos Def",
+  "Lauryn Hill",
+  "Missy Elliott",
+  "Doja Cat",
+  "Megan Thee Stallion",
+  "Lil Wayne",
+  "Drake",
+  "Chance the Rapper",
+  "Vince Staples",
+  "Earl Sweatshirt",
+  "Danny Brown",
+  "Playboi Carti",
+  "Beyoncé",
+  "Rihanna",
+  "Ariana Grande",
+  "Adele",
+  "Lady Gaga",
+  "Katy Perry",
+  "Britney Spears",
+  "Madonna",
+  "Prince",
+  "Whitney Houston",
+  "Mariah Carey",
+  "Justin Timberlake",
+  "Bruno Mars",
+  "The Weeknd",
+  "Harry Styles",
+  "Olivia Rodrigo",
+  "Charli XCX",
+  "Troye Sivan",
+  "Marvin Gaye",
+  "Al Green",
+  "Aretha Franklin",
+  "Anderson .Paak",
+  "H.E.R.",
+  "Jorja Smith",
+  "Solange",
+  "Janelle Monáe",
+  "Usher",
+  "Kraftwerk",
+  "The Chemical Brothers",
+  "Fatboy Slim",
+  "Justice",
+  "Disclosure",
+  "Flume",
+  "ODESZA",
+  "Boards of Canada",
+  "Burial",
+  "Jamie xx",
+  "Caribou",
+  "Bob Dylan",
+  "Neil Young",
+  "Johnny Cash",
+  "Willie Nelson",
+  "Simon & Garfunkel",
+  "Nick Drake",
+  "Leonard Cohen",
+  "First Aid Kit",
+  "Big Thief",
+  "Phoebe Bridgers",
+  "Kacey Musgraves",
+  "Chris Stapleton",
+  "Iron Maiden",
+  "Slayer",
+  "Judas Priest",
+  "Ramones",
+  "Sex Pistols",
+  "Dead Kennedys",
+  "System of a Down",
+  "Tool",
+  "Deftones",
+  "Slipknot",
+  "Thelonious Monk",
+  "Herbie Hancock",
+  "Charles Mingus",
+  "Nina Simone",
+  "Ella Fitzgerald",
+  "Billie Holiday",
+  "J Balvin",
+  "Karol G",
+  "Shakira",
+  "Peso Pluma",
+  "Feid",
+  "Ozuna",
+  "Blackpink",
+  "NewJeans",
+  "Stray Kids",
+  "Burning Spear",
+  "Toots and the Maytals",
+  "Damian Marley",
+  "Burna Boy",
+  "Wizkid",
+  "Fela Kuti",
+  "Tems",
+];
+
+type MBArtist = {
+  id: string;
+  name: string;
+  tags?: { name: string; count: number }[];
+};
+
+type MBReleaseGroup = {
+  id: string;
+  title: string;
+  "first-release-date"?: string;
+  "secondary-types"?: string[];
+};
+
+type MBRelease = {
+  id: string;
+  status?: string;
+  date?: string;
+  "cover-art-archive"?: { front?: boolean };
+};
+
+type MBRecordingRef = {
+  id: string;
+  title: string;
+  number: string;
+  position: number;
+  length?: number;
+  recording?: { id: string };
+};
+
+type MBReleaseDetail = {
+  id: string;
+  media?: { tracks?: MBRecordingRef[] }[];
+  relations?: MBRelation[];
+};
+
+type MBRelation = {
+  type: string;
+  artist?: { name: string };
+  "target-type"?: string;
+};
+
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function mbFetch<T>(path: string, retries = 5): Promise<T | null> {
+  const url = `${MB_BASE}${path}`;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: {
+          "User-Agent": USER_AGENT,
+          Accept: "application/json",
+          Connection: "close",
+        },
+      });
+    } catch (err) {
+      console.warn(
+        `  Network error on attempt ${attempt}/${retries} for ${path}: ${
+          (err as Error).message
+        }`
+      );
+      await sleep(3000 * attempt);
+      continue;
+    }
+    await sleep(MB_DELAY_MS);
+    if (res.ok) {
+      return (await res.json()) as T;
+    }
+    if (res.status === 503 || res.status === 429) {
+      await sleep(2000 * attempt);
+      continue;
+    }
+    console.warn(`  MusicBrainz ${res.status} for ${path}`);
+    return null;
+  }
+  return null;
+}
+
+async function fetchCoverUrl(releaseId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${CAA_BASE}/release/${releaseId}`, {
+      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+    });
+    await sleep(300);
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      images?: { front?: boolean; image: string; thumbnails?: Record<string, string> }[];
+    };
+    const front = data.images?.find((img) => img.front) ?? data.images?.[0];
+    const url = front?.thumbnails?.["500"] ?? front?.image ?? null;
+    // The Internet Archive sometimes returns plain-http URLs; coverartarchive.org
+    // serves https fine and that's all next/image is allowlisted for.
+    return url?.replace(/^http:\/\//, "https://") ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function titleCase(s: string) {
+  return s.replace(/\w\S*/g, (w) => w[0].toUpperCase() + w.slice(1).toLowerCase());
+}
+
+async function upsertArtist(mbArtist: MBArtist) {
+  const existingByMbid = await prisma.artist.findUnique({
+    where: { musicbrainzId: mbArtist.id },
+  });
+  if (existingByMbid) return existingByMbid;
+
+  const existingByName = await prisma.artist.findFirst({
+    where: { name: mbArtist.name },
+  });
+  if (existingByName) {
+    return prisma.artist.update({
+      where: { id: existingByName.id },
+      data: { musicbrainzId: mbArtist.id },
+    });
+  }
+
+  return prisma.artist.create({
+    data: { name: mbArtist.name, musicbrainzId: mbArtist.id },
+  });
+}
+
+async function upsertAlbum(params: {
+  artistId: string;
+  title: string;
+  musicbrainzId: string;
+  releaseDate: Date | null;
+  coverUrl: string | null;
+  releaseGroupType: string;
+}) {
+  const existingByMbid = await prisma.album.findUnique({
+    where: { musicbrainzId: params.musicbrainzId },
+  });
+  if (existingByMbid) return existingByMbid;
+
+  const existingByTitle = await prisma.album.findFirst({
+    where: { title: params.title, artistId: params.artistId },
+  });
+  if (existingByTitle) {
+    return prisma.album.update({
+      where: { id: existingByTitle.id },
+      data: {
+        musicbrainzId: params.musicbrainzId,
+        coverUrl: existingByTitle.coverUrl ?? params.coverUrl,
+        releaseDate: existingByTitle.releaseDate ?? params.releaseDate,
+        releaseGroupType: params.releaseGroupType,
+      },
+    });
+  }
+
+  return prisma.album.create({
+    data: {
+      title: params.title,
+      artistId: params.artistId,
+      musicbrainzId: params.musicbrainzId,
+      releaseDate: params.releaseDate,
+      coverUrl: params.coverUrl,
+      releaseGroupType: params.releaseGroupType,
+    },
+  });
+}
+
+async function importGenres(albumId: string, tags: { name: string; count: number }[]) {
+  const top = tags
+    .filter((t) => t.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3);
+  for (const tag of top) {
+    const name = titleCase(tag.name);
+    const genre = await prisma.genre.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
+    await prisma.albumGenre.upsert({
+      where: { albumId_genreId: { albumId, genreId: genre.id } },
+      update: {},
+      create: { albumId, genreId: genre.id },
+    });
+  }
+}
+
+async function importTracksAndCredits(
+  albumId: string,
+  releaseDetail: MBReleaseDetail,
+  primaryArtistName: string
+) {
+  const tracks = releaseDetail.media?.[0]?.tracks ?? [];
+
+  await prisma.track.deleteMany({ where: { albumId } });
+  for (const track of tracks) {
+    await prisma.track.create({
+      data: {
+        albumId,
+        title: track.title,
+        trackNumber: Number(track.number) || track.position,
+        durationSec: track.length ? Math.round(track.length / 1000) : null,
+        musicbrainzId: track.recording?.id ?? null,
+      },
+    });
+  }
+
+  const creditRows = new Map<string, string>();
+  creditRows.set(primaryArtistName, "Primary Artist");
+  for (const rel of releaseDetail.relations ?? []) {
+    if (rel["target-type"] === "artist" && rel.artist?.name) {
+      creditRows.set(rel.artist.name, titleCase(rel.type));
+    }
+  }
+
+  if (tracks[0]?.recording?.id) {
+    const recRels = await mbFetch<{ relations?: MBRelation[] }>(
+      `/recording/${tracks[0].recording.id}?inc=artist-rels&fmt=json`
+    );
+    for (const rel of recRels?.relations ?? []) {
+      if (rel["target-type"] === "artist" && rel.artist?.name) {
+        creditRows.set(rel.artist.name, titleCase(rel.type));
+      }
+    }
+  }
+
+  await prisma.credit.deleteMany({ where: { albumId } });
+  for (const [name, role] of creditRows) {
+    await prisma.credit.create({ data: { albumId, name, role } });
+  }
+}
+
+function normalizeName(s: string) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+async function importReleaseGroup(
+  rg: MBReleaseGroup,
+  artist: { id: string; name: string },
+  mbArtist: MBArtist,
+  releaseGroupType: string
+) {
+  const existing = await prisma.album.findUnique({
+    where: { musicbrainzId: rg.id },
+    select: { _count: { select: { tracks: true, credits: true } } },
+  });
+  if (existing && existing._count.tracks > 0 && existing._count.credits > 0) {
+    console.log(`  - [${releaseGroupType}] ${rg.title} (already imported, skipping)`);
+    return;
+  }
+
+  console.log(`  - [${releaseGroupType}] ${rg.title}`);
+  const releasesResult = await mbFetch<{ releases: MBRelease[] }>(
+    `/release?release-group=${rg.id}&fmt=json&limit=25`
+  );
+  const releases = releasesResult?.releases ?? [];
+  const chosen =
+    releases.find((r) => r.status === "Official" && r["cover-art-archive"]?.front) ??
+    releases.find((r) => r.status === "Official") ??
+    releases[0];
+  if (!chosen) {
+    console.warn(`    No release found, skipping`);
+    return;
+  }
+
+  const detail = await mbFetch<MBReleaseDetail>(
+    `/release/${chosen.id}?inc=recordings+artist-credits+artist-rels&fmt=json`
+  );
+  if (!detail) return;
+
+  const coverUrl = chosen["cover-art-archive"]?.front
+    ? await fetchCoverUrl(chosen.id)
+    : null;
+
+  const releaseDate = rg["first-release-date"] ? new Date(rg["first-release-date"]) : null;
+
+  const album = await upsertAlbum({
+    artistId: artist.id,
+    title: rg.title,
+    musicbrainzId: rg.id,
+    releaseDate: releaseDate && !isNaN(releaseDate.getTime()) ? releaseDate : null,
+    coverUrl,
+    releaseGroupType,
+  });
+
+  await importTracksAndCredits(album.id, detail, artist.name);
+  await importGenres(album.id, mbArtist.tags ?? []);
+}
+
+async function importArtistAlbums(artistName: string) {
+  console.log(`\n=== ${artistName} ===`);
+  const searchResult = await mbFetch<{ artists: MBArtist[] }>(
+    `/artist?query=${encodeURIComponent(`artist:${artistName}`)}&fmt=json&limit=5`
+  );
+  const candidates = searchResult?.artists ?? [];
+  const wanted = normalizeName(artistName);
+  const mbArtist =
+    candidates.find((a) => normalizeName(a.name) === wanted) ?? null;
+  if (!mbArtist) {
+    console.warn(
+      `  No confident MusicBrainz match for "${artistName}" (top candidate: ${
+        candidates[0]?.name ?? "none"
+      }), skipping`
+    );
+    return;
+  }
+
+  const artist = await upsertArtist(mbArtist);
+
+  const albumRgResult = await mbFetch<{ "release-groups": MBReleaseGroup[] }>(
+    `/release-group?artist=${mbArtist.id}&type=album&fmt=json&limit=100`
+  );
+  const albumGroups = (albumRgResult?.["release-groups"] ?? [])
+    .filter((rg) => !rg["secondary-types"]?.length)
+    .sort((a, b) =>
+      (a["first-release-date"] ?? "9999").localeCompare(b["first-release-date"] ?? "9999")
+    )
+    .slice(0, MAX_ALBUMS_PER_ARTIST);
+
+  for (const rg of albumGroups) {
+    await importReleaseGroup(rg, artist, mbArtist, "Album");
+  }
+
+  const singleRgResult = await mbFetch<{ "release-groups": MBReleaseGroup[] }>(
+    `/release-group?artist=${mbArtist.id}&type=single&fmt=json&limit=100`
+  );
+  const singleGroups = (singleRgResult?.["release-groups"] ?? [])
+    .sort((a, b) =>
+      (b["first-release-date"] ?? "0000").localeCompare(a["first-release-date"] ?? "0000")
+    )
+    .slice(0, MAX_SINGLES_PER_ARTIST);
+
+  for (const rg of singleGroups) {
+    await importReleaseGroup(rg, artist, mbArtist, "Single");
+  }
+}
+
+async function main() {
+  console.log(`Importing catalog data for ${ARTISTS.length} artists from MusicBrainz...`);
+  for (const artistName of ARTISTS) {
+    try {
+      await importArtistAlbums(artistName);
+    } catch (err) {
+      console.error(`Failed on ${artistName}:`, err);
+    }
+  }
+  console.log("\nDone.");
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
