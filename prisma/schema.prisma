@@ -15,7 +15,7 @@ model User {
   name         String?
   bio          String?
   avatarUrl    String?
-  themeColor   String   @default("coral")
+  themeColor   String   @default("amber")
   themeMode    String   @default("dark")
   createdAt    DateTime @default(now())
 

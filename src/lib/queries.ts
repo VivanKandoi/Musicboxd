@@ -122,6 +122,56 @@ export async function getUserStats(userId: string) {
   };
 }
 
+export async function getMonthlyJournalStats(userId: string) {
+  const now = new Date();
+  const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+  const [thisMonthLogs, lastMonthCount, genreRows] = await Promise.all([
+    prisma.log.findMany({
+      where: { userId, createdAt: { gte: startOfThisMonth } },
+      select: { rating: true, albumId: true },
+    }),
+    prisma.log.count({
+      where: {
+        userId,
+        createdAt: { gte: startOfLastMonth, lt: startOfThisMonth },
+      },
+    }),
+    prisma.albumGenre.findMany({
+      where: {
+        album: { logs: { some: { userId, createdAt: { gte: startOfThisMonth } } } },
+      },
+      select: { genre: { select: { name: true } } },
+    }),
+  ]);
+
+  const songsLoggedThisMonth = thisMonthLogs.length;
+  const rated = thisMonthLogs.filter((l) => l.rating != null);
+  const avgRating =
+    rated.length > 0
+      ? rated.reduce((sum, l) => sum + (l.rating ?? 0), 0) / rated.length
+      : null;
+
+  const genreCounts = new Map<string, number>();
+  for (const row of genreRows) {
+    genreCounts.set(row.genre.name, (genreCounts.get(row.genre.name) ?? 0) + 1);
+  }
+  const topGenre = Array.from(genreCounts.entries()).sort((a, b) => b[1] - a[1])[0];
+
+  const pctChange =
+    lastMonthCount > 0
+      ? Math.round(((songsLoggedThisMonth - lastMonthCount) / lastMonthCount) * 100)
+      : null;
+
+  return {
+    songsLoggedThisMonth,
+    pctChangeVsLastMonth: pctChange,
+    avgRating,
+    topGenre: topGenre?.[0] ?? null,
+  };
+}
+
 export async function getAlbumDetail(id: string) {
   return prisma.album.findUnique({
     where: { id },
@@ -187,6 +237,35 @@ export async function getAlbumRatingSummary(albumId: string) {
     _count: { rating: true },
   });
   return { avgRating: agg._avg.rating, ratingCount: agg._count.rating };
+}
+
+export async function getAlbumRatingDistribution(albumId: string) {
+  const logs = await prisma.log.findMany({
+    where: { albumId, rating: { not: null } },
+    select: { rating: true },
+  });
+  const buckets = [5, 4, 3, 2, 1].map((star) => ({
+    star,
+    count: logs.filter((l) => l.rating! > star - 1 && l.rating! <= star).length,
+  }));
+  const total = logs.length;
+  return buckets.map((b) => ({
+    ...b,
+    pct: total > 0 ? Math.round((b.count / total) * 100) : 0,
+  }));
+}
+
+export async function getUserAlbumActivity(userId: string, albumId: string) {
+  const logs = await prisma.log.findMany({
+    where: { userId, albumId },
+    orderBy: { createdAt: "desc" },
+  });
+  return {
+    timesLogged: logs.length,
+    latestRating: logs[0]?.rating ?? null,
+    latestNote: logs[0]?.reviewText ?? null,
+    latestLoggedAt: logs[0]?.listenedAt ?? null,
+  };
 }
 
 export async function getAlbumReviews(albumId: string, viewerId: string | null) {
@@ -294,6 +373,52 @@ export async function getFollowing(userId: string) {
     select: { following: { select: followUserSelect } },
   });
   return rows.map((r) => r.following);
+}
+
+export async function getTrendingAlbums(take = 5) {
+  const since = new Date(Date.now() - 30 * 86400000);
+  const grouped = await prisma.log.groupBy({
+    by: ["albumId"],
+    where: { createdAt: { gte: since } },
+    _count: { albumId: true },
+    orderBy: { _count: { albumId: "desc" } },
+    take,
+  });
+  if (grouped.length === 0) return [];
+  const albums = await prisma.album.findMany({
+    where: { id: { in: grouped.map((g) => g.albumId) } },
+    select: {
+      id: true,
+      title: true,
+      coverUrl: true,
+      artist: { select: { name: true } },
+    },
+  });
+  const albumById = new Map(albums.map((a) => [a.id, a]));
+  return grouped
+    .map((g) => {
+      const album = albumById.get(g.albumId);
+      return album ? { album, logCount: g._count.albumId } : null;
+    })
+    .filter((x): x is { album: (typeof albums)[number]; logCount: number } => x !== null);
+}
+
+export async function getSuggestedUsers(viewerId: string, take = 5) {
+  const following = await prisma.follow.findMany({
+    where: { followerId: viewerId },
+    select: { followingId: true },
+  });
+  const allUsers = await prisma.user.findMany({
+    where: { id: { not: viewerId } },
+    select: {
+      ...followUserSelect,
+      _count: { select: { logs: true } },
+    },
+    orderBy: { logs: { _count: "desc" } },
+    take: take + following.length + 1,
+  });
+  const followingIds = new Set(following.map((f) => f.followingId));
+  return allUsers.filter((u) => !followingIds.has(u.id)).slice(0, take);
 }
 
 export async function getArtistDetail(id: string) {
