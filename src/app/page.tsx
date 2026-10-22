@@ -3,8 +3,11 @@ import { Sparkles, Search as SearchIcon, ArrowRight } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getUserDiary, getFeedLogs, getRecentAlbums } from "@/lib/queries";
+import { getRecommendations } from "@/lib/recommendations";
+import { getOnThisDay } from "@/lib/on-this-day";
 import { AlbumCard } from "@/components/album-card";
-import { DEMO_RECOMMENDATIONS } from "@/lib/demo-discover-data";
+import { RecommendationCard } from "@/components/recommendation-card";
+import { OnThisDay } from "@/components/on-this-day";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -81,9 +84,11 @@ export default async function HomePage() {
   });
   const followedIds = following.map((f) => f.followingId);
 
-  const [recentlyLogged, communityPicks] = await Promise.all([
+  const [recentlyLogged, communityPicks, recommendations, onThisDay] = await Promise.all([
     getUserDiary(session.user.id, session.user.id, 6),
     getFeedLogs(followedIds, session.user.id),
+    getRecommendations(session.user.id),
+    getOnThisDay(session.user.id),
   ]);
   const communityPreview = communityPicks.slice(0, 2);
 
@@ -116,6 +121,8 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {onThisDay.length > 0 && <OnThisDay logs={onThisDay} />}
+
       <section>
         <h2 className="mb-3 text-lg font-medium">Recently Logged</h2>
         {recentlyLogged.length === 0 ? (
@@ -139,88 +146,90 @@ export default async function HomePage() {
         )}
       </section>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
+      {recommendations.length > 0 && (
         <section>
-          <h2 className="mb-3 text-lg font-medium">AI-Curated Recommendations</h2>
-          <div className="flex flex-col gap-3">
-            {DEMO_RECOMMENDATIONS.map((rec) => (
-              <div
-                key={rec.title}
-                className="flex items-center gap-4 rounded-xl border border-border bg-surface p-3"
-              >
-                <div
-                  className="h-14 w-14 shrink-0 rounded-lg bg-cover bg-center"
-                  style={{ backgroundImage: `linear-gradient(135deg, ${rec.gradient})` }}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {rec.title}
-                  </p>
-                  <p className="truncate text-xs text-muted">{rec.artist}</p>
-                  <p className="truncate text-xs text-muted">{rec.reason}</p>
-                </div>
-                <span className="shrink-0 rounded-full bg-accent/15 px-2.5 py-1 text-xs font-medium text-accent">
-                  {rec.match}% Match
-                </span>
-              </div>
+          <h2 className="mb-3 text-lg font-medium">You&rsquo;ll also enjoy</h2>
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            {recommendations.map((rec) => (
+              <RecommendationCard key={rec.id} recommendation={rec} />
             ))}
           </div>
         </section>
+      )}
 
-        <section className="flex flex-col gap-4">
-          <div>
-            <h2 className="mb-3 text-lg font-medium">Community Picks</h2>
-            {communityPreview.length === 0 ? (
-              <p className="text-sm text-muted">
-                Follow other listeners to see their activity here.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {communityPreview.map((log) => (
-                  <div
-                    key={log.id}
-                    className="rounded-xl border border-border bg-surface p-3 text-sm"
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
+        <section>
+          <h2 className="mb-3 text-lg font-medium">Community Activities</h2>
+          {communityPreview.length === 0 ? (
+            <p className="text-sm text-muted">
+              Follow other listeners to see their activity here.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {communityPreview.map((log) => (
+                <div
+                  key={log.id}
+                  className="rounded-xl border border-border bg-surface p-3 text-sm"
+                >
+                  <Link
+                    href={`/u/${log.user.username}`}
+                    className="font-medium text-foreground hover:text-accent"
                   >
-                    <Link
-                      href={`/u/${log.user.username}`}
-                      className="font-medium text-foreground hover:text-accent"
-                    >
-                      {log.user.name || log.user.username}
-                    </Link>{" "}
-                    <span className="text-muted">
-                      {log.isRelisten ? "relistened to" : "logged"}
-                    </span>{" "}
-                    <Link
-                      href={`/album/${log.album.id}`}
-                      className="text-foreground hover:text-accent"
-                    >
-                      &lsquo;{log.album.title}&rsquo;
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                    {log.user.name || log.user.username}
+                  </Link>{" "}
+                  <span className="text-muted">
+                    {log.isRelisten ? "relistened to" : "logged"}
+                  </span>{" "}
+                  <Link
+                    href={`/album/${log.album.id}`}
+                    className="text-foreground hover:text-accent"
+                  >
+                    &lsquo;{log.album.title}&rsquo;
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
+        <div className="flex flex-col gap-4">
           <Link
-            href="/discover"
-            className="flex flex-col gap-2 rounded-xl border border-accent/40 bg-accent/5 p-4"
+            href="/guides"
+            className="flex h-fit flex-col gap-2 rounded-xl border border-border bg-surface p-4"
           >
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <Sparkles size={15} className="text-accent" />
-              Semantic Search
+              Start Here Guides
             </div>
             <p className="text-xs text-muted">
-              Find music that matches how you feel. Describe your mood,
-              scenery, or weather in plain natural language and let our AI
-              curate the perfect soundtrack.
+              Curated deep dives into genres and eras — golden-age hip hop,
+              90s grunge, neo-soul, and more.
             </p>
             <span className="flex items-center gap-1 text-xs font-medium text-accent">
-              Try Semantic Discovery
+              Browse guides
               <ArrowRight size={13} />
             </span>
           </Link>
-        </section>
+
+        <Link
+          href="/discover"
+          className="flex h-fit flex-col gap-2 rounded-xl border border-accent/40 bg-accent/5 p-4"
+        >
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Sparkles size={15} className="text-accent" />
+            Semantic Search
+          </div>
+          <p className="text-xs text-muted">
+            Find music that matches how you feel. Describe your mood,
+            scenery, or weather in plain natural language and let our AI
+            curate the perfect soundtrack.
+          </p>
+          <span className="flex items-center gap-1 text-xs font-medium text-accent">
+            Try Semantic Discovery
+            <ArrowRight size={13} />
+          </span>
+        </Link>
+        </div>
       </div>
     </div>
   );

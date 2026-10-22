@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Sparkles, Search, BookOpen, Users, UserRound } from "lucide-react";
+import { Home, Sparkles, BookOpen, Users, UserRound } from "lucide-react";
 
 export function NavLinks({ username }: { username: string }) {
   const pathname = usePathname();
@@ -10,7 +10,6 @@ export function NavLinks({ username }: { username: string }) {
   const links = [
     { href: "/", label: "Home", icon: Home, match: (p: string) => p === "/" },
     { href: "/discover", label: "Discover", icon: Sparkles, match: (p: string) => p.startsWith("/discover") },
-    { href: "/search", label: "Search", icon: Search, match: (p: string) => p.startsWith("/search") },
     {
       href: `/u/${username}/diary`,
       label: "Journal",

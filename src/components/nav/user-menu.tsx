@@ -20,10 +20,7 @@ export function UserMenu({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div
-            className="absolute right-0 z-20 mt-2 w-48 rounded-lg border border-border bg-surface p-1 shadow-lg"
-            onClick={() => setOpen(false)}
-          >
+          <div className="absolute right-0 z-20 mt-2 w-48 rounded-lg border border-border bg-surface p-1 shadow-lg">
             {children}
           </div>
         </>

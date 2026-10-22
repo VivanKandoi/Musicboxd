@@ -19,14 +19,29 @@ model User {
   themeMode    String   @default("dark")
   createdAt    DateTime @default(now())
 
+  isPrivate          Boolean @default(false)
+  dmPrivacy          String  @default("everyone") // everyone | followers | none
+  notifyOnFollow     Boolean @default(true)
+  notifyOnLike       Boolean @default(true)
+  notifyOnComment    Boolean @default(true)
+  notifyOnMessage    Boolean @default(true)
+  emailNotifications Boolean @default(true)
+
   logs         Log[]
   comments     Comment[]
   likes        Like[]
   fiveFaves    FiveFave[]
   trackRatings TrackRating[]
+  rankedLists  RankedList[]
 
   following Follow[] @relation("follower")
   followers Follow[] @relation("following")
+
+  sentMessages     Message[] @relation("sentMessages")
+  receivedMessages Message[] @relation("receivedMessages")
+
+  notifications      Notification[] @relation("notifUser")
+  notificationsCaused Notification[] @relation("notifActor")
 }
 
 model Follow {
@@ -84,6 +99,8 @@ model Album {
   genres    AlbumGenre[]
   logs      Log[]
   fiveFaves FiveFave[]
+  rankedListItems RankedListItem[]
+  sharedInMessages Message[]
 
   @@index([artistId])
   @@index([title])
@@ -143,6 +160,9 @@ model Log {
 
   likes    Like[]
   comments Comment[]
+  contextTags LogContextTag[]
+  sharedInMessages Message[]
+  notifications Notification[]
 
   @@index([userId])
   @@index([albumId])
@@ -183,4 +203,84 @@ model FiveFave {
 
   @@unique([userId, position])
   @@unique([userId, albumId])
+}
+
+model Message {
+  id            String    @id @default(cuid())
+  sender        User      @relation("sentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId      String
+  recipient     User      @relation("receivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+  recipientId   String
+  text          String?
+  sharedAlbum   Album?    @relation(fields: [sharedAlbumId], references: [id], onDelete: SetNull)
+  sharedAlbumId String?
+  sharedLog     Log?      @relation(fields: [sharedLogId], references: [id], onDelete: SetNull)
+  sharedLogId   String?
+  readAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([senderId, recipientId])
+  @@index([recipientId, senderId])
+  @@index([recipientId, readAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  user      User     @relation("notifUser", fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  actor     User?    @relation("notifActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId   String?
+  type      String // follow | like | comment | message
+  log       Log?     @relation(fields: [logId], references: [id], onDelete: Cascade)
+  logId     String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, read])
+}
+
+model RankedList {
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  title       String
+  description String?
+  isPublic    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items RankedListItem[]
+
+  @@index([userId])
+}
+
+model RankedListItem {
+  id       String     @id @default(cuid())
+  list     RankedList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listId   String
+  album    Album      @relation(fields: [albumId], references: [id])
+  albumId  String
+  position Int
+  note     String?
+
+  @@unique([listId, albumId])
+  @@index([listId, position])
+}
+
+model ContextTag {
+  id   String @id @default(cuid())
+  name String @unique
+
+  logs LogContextTag[]
+}
+
+model LogContextTag {
+  log   Log        @relation(fields: [logId], references: [id], onDelete: Cascade)
+  logId String
+  tag   ContextTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId String
+
+  @@id([logId, tagId])
+  @@index([tagId])
 }

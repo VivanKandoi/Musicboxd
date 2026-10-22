@@ -13,6 +13,7 @@ const logInclude = {
     },
   },
   _count: { select: { likes: true, comments: true } },
+  contextTags: { select: { tag: { select: { name: true } } } },
 } as const;
 
 export type FeedLog = Awaited<ReturnType<typeof getFeedLogs>>[number];
@@ -31,9 +32,28 @@ async function attachLikedByMe<
   return logs.map((log) => ({ ...log, likedByMe: likedSet.has(log.id) }));
 }
 
-export async function getFeedLogs(followedUserIds: string[], viewerId: string | null) {
+export type FeedFilters = {
+  userId?: string;
+  artistId?: string;
+  albumId?: string;
+};
+
+export async function getFeedLogs(
+  followedUserIds: string[],
+  viewerId: string | null,
+  filters: FeedFilters = {}
+) {
+  const scopedUserId =
+    filters.userId && followedUserIds.includes(filters.userId)
+      ? filters.userId
+      : undefined;
+
   const logs = await prisma.log.findMany({
-    where: { userId: { in: followedUserIds } },
+    where: {
+      userId: scopedUserId ?? { in: followedUserIds },
+      ...(filters.albumId ? { albumId: filters.albumId } : {}),
+      ...(filters.artistId ? { album: { artistId: filters.artistId } } : {}),
+    },
     orderBy: { createdAt: "desc" },
     take: 30,
     include: logInclude,
@@ -228,6 +248,21 @@ export async function getAlbumTrackRatings(albumId: string, viewerId: string | n
     albumTrackRating,
     ratedTrackCount: ratedAverages.length,
   };
+}
+
+export async function getAlbumPopularTags(albumId: string, take = 8) {
+  const rows = await prisma.logContextTag.findMany({
+    where: { log: { albumId } },
+    select: { tag: { select: { name: true } } },
+  });
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    counts.set(row.tag.name, (counts.get(row.tag.name) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, take)
+    .map(([name, count]) => ({ name, count }));
 }
 
 export async function getAlbumRatingSummary(albumId: string) {

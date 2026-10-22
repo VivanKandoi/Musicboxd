@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { Logo } from "@/components/nav/logo";
 import { NavLinks } from "@/components/nav/nav-links";
 import { NotificationBell } from "@/components/nav/notification-bell";
+import { MessagesLink } from "@/components/nav/messages-link";
 import { SearchBox } from "@/components/nav/search-box";
 import { UserMenu } from "@/components/nav/user-menu";
 import { LogoutButton } from "@/components/nav/logout-button";
@@ -33,6 +34,7 @@ export async function Navbar() {
 
           {session?.user ? (
             <div className="flex items-center gap-3">
+              <MessagesLink />
               <NotificationBell />
               <Link
                 href="/settings"

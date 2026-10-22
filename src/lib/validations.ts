@@ -24,6 +24,7 @@ export const logSchema = z.object({
   reviewText: z.string().max(5000).nullable().optional(),
   listenedAt: z.string().optional(),
   isRelisten: z.boolean().optional(),
+  tags: z.array(z.string().min(1).max(30)).max(8).optional(),
 });
 
 export const commentSchema = z.object({
@@ -43,6 +44,39 @@ export const fiveFavesSchema = z.object({
 export const settingsSchema = z.object({
   themeColor: z.enum(THEME_COLOR_IDS),
   themeMode: z.enum(THEME_MODES),
+});
+
+export const DM_PRIVACY_OPTIONS = ["everyone", "followers", "none"] as const;
+
+export const preferencesSchema = z.object({
+  isPrivate: z.boolean().optional(),
+  dmPrivacy: z.enum(DM_PRIVACY_OPTIONS).optional(),
+  notifyOnFollow: z.boolean().optional(),
+  notifyOnLike: z.boolean().optional(),
+  notifyOnComment: z.boolean().optional(),
+  notifyOnMessage: z.boolean().optional(),
+  emailNotifications: z.boolean().optional(),
+});
+
+export const rankedListSchema = z.object({
+  title: z.string().min(1).max(80),
+  description: z.string().max(500).nullable().optional(),
+  isPublic: z.boolean().optional(),
+});
+
+export const rankedListItemSchema = z.object({
+  albumId: z.string().min(1),
+  note: z.string().max(280).nullable().optional(),
+});
+
+export const reorderSchema = z.object({
+  itemIds: z.array(z.string().min(1)).min(1),
+});
+
+export const messageSchema = z.object({
+  text: z.string().max(2000).nullable().optional(),
+  sharedAlbumId: z.string().optional(),
+  sharedLogId: z.string().optional(),
 });
 
 export const trackRatingSchema = z.object({

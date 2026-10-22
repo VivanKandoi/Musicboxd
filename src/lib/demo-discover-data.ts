@@ -3,30 +3,6 @@
 // embedding search is a later phase) - this is a visual demo of where that
 // feature will live, not a working recommender.
 
-export const DEMO_RECOMMENDATIONS = [
-  {
-    title: "Retrograde Motion",
-    artist: "Solaris Unit",
-    reason: "Similar to your recent listens · High energy synth",
-    match: 98,
-    gradient: "#7c3aed, #ec4899",
-  },
-  {
-    title: "Whispers of the Sea",
-    artist: "Oceanic Mist",
-    reason: "Based on your recent mood",
-    match: 94,
-    gradient: "#0ea5e9, #06b6d4",
-  },
-  {
-    title: "Starlight Drive",
-    artist: "Hologram Club",
-    reason: "Perfect fit for night-driving tempo curves",
-    match: 91,
-    gradient: "#f59e0b, #ef4444",
-  },
-];
-
 export const DEMO_SUGGESTIONS = [
   "Upbeat songs for a rainy day",
   "Music that sounds like driving at sunset",

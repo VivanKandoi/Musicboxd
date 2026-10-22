@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Repeat } from "lucide-react";
 import { StarRating } from "@/components/star-rating";
+import { TagInput } from "@/components/tag-input";
 
 export function LogForm({ albumId, hasLoggedBefore }: { albumId: string; hasLoggedBefore: boolean }) {
   const router = useRouter();
@@ -14,6 +15,7 @@ export function LogForm({ albumId, hasLoggedBefore }: { albumId: string; hasLogg
     new Date().toISOString().slice(0, 10)
   );
   const [isRelisten, setIsRelisten] = useState(hasLoggedBefore);
+  const [tags, setTags] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,6 +32,7 @@ export function LogForm({ albumId, hasLoggedBefore }: { albumId: string; hasLogg
         reviewText: reviewText || null,
         listenedAt: new Date(listenedAt).toISOString(),
         isRelisten,
+        tags,
       }),
     });
     setPending(false);
@@ -41,6 +44,7 @@ export function LogForm({ albumId, hasLoggedBefore }: { albumId: string; hasLogg
     setOpen(false);
     setRating(null);
     setReviewText("");
+    setTags([]);
     router.refresh();
   }
 
@@ -96,6 +100,8 @@ export function LogForm({ albumId, hasLoggedBefore }: { albumId: string; hasLogg
           className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
         />
       </label>
+
+      <TagInput tags={tags} onChange={setTags} />
 
       <div className="flex flex-wrap items-center gap-4">
         <label className="flex items-center gap-2 text-xs text-muted">

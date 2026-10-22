@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SettingsForm } from "@/components/settings-form";
+import { PreferencesForm } from "@/components/preferences-form";
 import type { ThemeColorId, ThemeMode } from "@/lib/theme";
 
 export default async function SettingsPage() {
@@ -10,16 +11,41 @@ export default async function SettingsPage() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { themeColor: true, themeMode: true },
+    select: {
+      themeColor: true,
+      themeMode: true,
+      isPrivate: true,
+      dmPrivacy: true,
+      notifyOnFollow: true,
+      notifyOnLike: true,
+      notifyOnComment: true,
+      notifyOnMessage: true,
+      emailNotifications: true,
+    },
   });
 
   return (
     <div className="max-w-lg">
       <h1 className="mb-6 text-2xl font-semibold">Settings</h1>
-      <SettingsForm
-        initialThemeColor={(user?.themeColor ?? "coral") as ThemeColorId}
-        initialThemeMode={(user?.themeMode ?? "dark") as ThemeMode}
-      />
+      <div className="flex flex-col gap-10">
+        <SettingsForm
+          initialThemeColor={(user?.themeColor ?? "coral") as ThemeColorId}
+          initialThemeMode={(user?.themeMode ?? "dark") as ThemeMode}
+        />
+        <div className="border-t border-border pt-8">
+          <PreferencesForm
+            initial={{
+              isPrivate: user?.isPrivate ?? false,
+              dmPrivacy: (user?.dmPrivacy ?? "everyone") as "everyone" | "followers" | "none",
+              notifyOnFollow: user?.notifyOnFollow ?? true,
+              notifyOnLike: user?.notifyOnLike ?? true,
+              notifyOnComment: user?.notifyOnComment ?? true,
+              notifyOnMessage: user?.notifyOnMessage ?? true,
+              emailNotifications: user?.emailNotifications ?? true,
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 }

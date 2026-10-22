@@ -10,11 +10,14 @@ import {
   getUserAlbumActivity,
   getAlbumReviews,
   getAlbumTrackRatings,
+  getAlbumPopularTags,
 } from "@/lib/queries";
 import { StarRating } from "@/components/star-rating";
 import { LogForm } from "@/components/log-form";
 import { ActivityItem } from "@/components/activity-item";
 import { TrackRatingRow } from "@/components/track-rating-row";
+import { AddToListButton } from "@/components/add-to-list-button";
+import { ShareToDmButton } from "@/components/share-to-dm-button";
 
 function formatDuration(sec: number | null) {
   if (!sec) return "";
@@ -29,12 +32,14 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
   const album = await getAlbumDetail(id);
   if (!album) notFound();
 
-  const [{ avgRating, ratingCount }, distribution, reviews, trackRatings] = await Promise.all([
-    getAlbumRatingSummary(id),
-    getAlbumRatingDistribution(id),
-    getAlbumReviews(id, session?.user?.id ?? null),
-    getAlbumTrackRatings(id, session?.user?.id ?? null),
-  ]);
+  const [{ avgRating, ratingCount }, distribution, reviews, trackRatings, popularTags] =
+    await Promise.all([
+      getAlbumRatingSummary(id),
+      getAlbumRatingDistribution(id),
+      getAlbumReviews(id, session?.user?.id ?? null),
+      getAlbumTrackRatings(id, session?.user?.id ?? null),
+      getAlbumPopularTags(id),
+    ]);
 
   const userActivity = session?.user
     ? await getUserAlbumActivity(session.user.id, id)
@@ -114,7 +119,11 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
                 Play Track
               </button>
               {session?.user ? (
-                <LogForm albumId={album.id} hasLoggedBefore={(userActivity?.timesLogged ?? 0) > 0} />
+                <>
+                  <LogForm albumId={album.id} hasLoggedBefore={(userActivity?.timesLogged ?? 0) > 0} />
+                  <AddToListButton albumId={album.id} />
+                  <ShareToDmButton sharedAlbumId={album.id} label="Share with a friend" />
+                </>
               ) : (
                 <Link
                   href="/login"
@@ -192,6 +201,21 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
               ))}
             </div>
           )}
+          {popularTags.length > 0 && (
+            <div className="mt-4 border-t border-border pt-3">
+              <p className="mb-2 text-xs text-muted">Popular listening contexts</p>
+              <div className="flex flex-wrap gap-1.5">
+                {popularTags.map((t) => (
+                  <span
+                    key={t.name}
+                    className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[11px] text-muted"
+                  >
+                    #{t.name} · {t.count}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -252,6 +276,7 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
                 key={log.id}
                 log={log}
                 isAuthenticated={Boolean(session?.user)}
+                viewerId={session?.user?.id}
               />
             ))}
           </div>

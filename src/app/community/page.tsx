@@ -12,24 +12,42 @@ import {
 import { AlbumCard } from "@/components/album-card";
 import { ActivityItem } from "@/components/activity-item";
 import { FollowButton } from "@/components/follow-button";
+import { FeedFilterBar } from "@/components/feed-filter-bar";
 
-export default async function CommunityPage() {
+export default async function CommunityPage({
+  searchParams,
+}: PageProps<"/community">) {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
+  const { user: userFilter, artist: artistFilter, album: albumFilter } =
+    await searchParams;
+  const userId = typeof userFilter === "string" ? userFilter : undefined;
+  const artistId = typeof artistFilter === "string" ? artistFilter : undefined;
+  const albumId = typeof albumFilter === "string" ? albumFilter : undefined;
+
   const following = await prisma.follow.findMany({
     where: { followerId: session.user.id },
-    select: { followingId: true },
+    select: { followingId: true, following: { select: { id: true, username: true, name: true } } },
   });
   const followedIds = following.map((f) => f.followingId);
   const idsForFeed = [...followedIds, session.user.id];
+  const people = [
+    { id: session.user.id, username: session.user.username, name: session.user.name ?? null },
+    ...following.map((f) => f.following),
+  ];
 
-  const [feed, friendsListening, trending, suggested] = await Promise.all([
-    getFeedLogs(idsForFeed, session.user.id),
-    getFriendsListening(followedIds),
-    getTrendingAlbums(5),
-    getSuggestedUsers(session.user.id, 5),
-  ]);
+  const [feed, friendsListening, trending, suggested, activeArtist, activeAlbum] =
+    await Promise.all([
+      getFeedLogs(idsForFeed, session.user.id, { userId, artistId, albumId }),
+      getFriendsListening(followedIds),
+      getTrendingAlbums(5),
+      getSuggestedUsers(session.user.id, 5),
+      artistId ? prisma.artist.findUnique({ where: { id: artistId }, select: { name: true } }) : null,
+      albumId ? prisma.album.findUnique({ where: { id: albumId }, select: { title: true } }) : null,
+    ]);
+
+  const activeUser = userId ? people.find((p) => p.id === userId) : null;
 
   return (
     <div>
@@ -44,18 +62,35 @@ export default async function CommunityPage() {
             <h2 className="mb-3 text-lg font-medium">
               Recent activity from your circle
             </h2>
+            <FeedFilterBar
+              people={people}
+              activeUserLabel={activeUser ? activeUser.name || activeUser.username : null}
+              activeArtistLabel={activeArtist?.name ?? null}
+              activeAlbumLabel={activeAlbum?.title ?? null}
+            />
             {feed.length === 0 ? (
               <p className="text-sm text-muted">
-                No activity yet.{" "}
-                <Link href="/search" className="text-accent hover:underline">
-                  Find people to follow
-                </Link>{" "}
-                or log an album to get started.
+                {userId || artistId || albumId ? (
+                  "No logs match this filter."
+                ) : (
+                  <>
+                    No activity yet.{" "}
+                    <Link href="/search" className="text-accent hover:underline">
+                      Find people to follow
+                    </Link>{" "}
+                    or log an album to get started.
+                  </>
+                )}
               </p>
             ) : (
               <div>
                 {feed.map((log) => (
-                  <ActivityItem key={log.id} log={log} isAuthenticated />
+                  <ActivityItem
+                    key={log.id}
+                    log={log}
+                    isAuthenticated
+                    viewerId={session.user.id}
+                  />
                 ))}
               </div>
             )}

@@ -1,10 +1,9 @@
-import Image from "next/image";
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Lock } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getUserDiary, getMonthlyJournalStats } from "@/lib/queries";
-import { StarRating } from "@/components/star-rating";
+import { JournalEntryCard } from "@/components/journal-entry-card";
 
 function formatGroupHeading(date: Date) {
   const today = new Date();
@@ -27,6 +26,28 @@ export default async function DiaryPage({ params }: PageProps<"/u/[username]/dia
   if (!user) notFound();
 
   const isOwnJournal = session?.user?.id === user.id;
+
+  const isFollowing = session?.user
+    ? Boolean(
+        await prisma.follow.findUnique({
+          where: {
+            followerId_followingId: { followerId: session.user.id, followingId: user.id },
+          },
+        })
+      )
+    : false;
+
+  if (user.isPrivate && !isOwnJournal && !isFollowing) {
+    return (
+      <div className="flex flex-col items-center gap-2 rounded-xl border border-border bg-surface p-10 text-center">
+        <Lock size={20} className="text-muted" />
+        <p className="text-sm font-medium text-foreground">This journal is private</p>
+        <p className="text-xs text-muted">
+          Follow @{user.username} to see their journal.
+        </p>
+      </div>
+    );
+  }
 
   const [diary, monthlyStats] = await Promise.all([
     getUserDiary(user.id, session?.user?.id ?? null, 200),
@@ -64,49 +85,7 @@ export default async function DiaryPage({ params }: PageProps<"/u/[username]/dia
                   <h2 className="mb-2 text-sm font-medium text-muted">{group.heading}</h2>
                   <div className="flex flex-col gap-2">
                     {group.logs.map((log) => (
-                      <div
-                        key={log.id}
-                        className="flex items-start gap-3 rounded-xl border border-border bg-surface p-3"
-                      >
-                        <Link href={`/album/${log.album.id}`} className="shrink-0">
-                          <div className="relative h-14 w-14 overflow-hidden rounded-lg bg-surface-2 ring-1 ring-border">
-                            {log.album.coverUrl && (
-                              <Image
-                                src={log.album.coverUrl}
-                                alt={log.album.title}
-                                fill
-                                sizes="56px"
-                                className="object-cover"
-                              />
-                            )}
-                          </div>
-                        </Link>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <Link
-                                href={`/album/${log.album.id}`}
-                                className="truncate text-sm font-medium text-foreground hover:text-accent"
-                              >
-                                {log.album.title}
-                              </Link>
-                              <p className="truncate text-xs text-muted">
-                                {log.album.artist.name}
-                              </p>
-                            </div>
-                            {log.rating != null && (
-                              <div className="flex shrink-0 items-center gap-1">
-                                <StarRating value={log.rating} readOnly size="sm" />
-                              </div>
-                            )}
-                          </div>
-                          {log.reviewText && (
-                            <p className="mt-1 line-clamp-2 text-xs text-foreground/80">
-                              &ldquo;{log.reviewText}&rdquo;
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                      <JournalEntryCard key={log.id} log={log} isOwner={isOwnJournal} />
                     ))}
                   </div>
                 </div>
