@@ -12,7 +12,11 @@ function formatGroupHeading(date: Date) {
   d.setHours(0, 0, 0, 0);
   const diffDays = Math.round((today.getTime() - d.getTime()) / 86400000);
 
-  const formatted = date.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+  const formatted = date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    ...(d.getFullYear() !== today.getFullYear() ? { year: "numeric" } : {}),
+  });
   if (diffDays === 0) return `Today, ${formatted}`;
   if (diffDays === 1) return `Yesterday, ${formatted}`;
   return formatted;
@@ -54,14 +58,15 @@ export default async function DiaryPage({ params }: PageProps<"/u/[username]/dia
     getMonthlyJournalStats(user.id),
   ]);
 
-  const groups: { heading: string; logs: typeof diary }[] = [];
+  const groups: { key: string; heading: string; logs: typeof diary }[] = [];
   for (const log of diary) {
-    const heading = formatGroupHeading(new Date(log.listenedAt));
+    const date = new Date(log.listenedAt);
+    const key = date.toDateString();
     const lastGroup = groups[groups.length - 1];
-    if (lastGroup && lastGroup.heading === heading) {
+    if (lastGroup && lastGroup.key === key) {
       lastGroup.logs.push(log);
     } else {
-      groups.push({ heading, logs: [log] });
+      groups.push({ key, heading: formatGroupHeading(date), logs: [log] });
     }
   }
 
@@ -81,7 +86,7 @@ export default async function DiaryPage({ params }: PageProps<"/u/[username]/dia
           ) : (
             <div className="flex flex-col gap-6">
               {groups.map((group) => (
-                <div key={group.heading}>
+                <div key={group.key}>
                   <h2 className="mb-2 text-sm font-medium text-muted">{group.heading}</h2>
                   <div className="flex flex-col gap-2">
                     {group.logs.map((log) => (
