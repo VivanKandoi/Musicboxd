@@ -9,13 +9,17 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const lists = await prisma.rankedList.findMany({
+  const memberships = await prisma.listMember.findMany({
     where: { userId: session.user.id },
-    orderBy: { updatedAt: "desc" },
-    include: { _count: { select: { items: true } } },
+    include: {
+      list: { include: { _count: { select: { items: true } } } },
+    },
+    orderBy: { list: { updatedAt: "desc" } },
   });
 
-  return NextResponse.json({ lists });
+  return NextResponse.json({
+    lists: memberships.map((m) => ({ ...m.list, role: m.role })),
+  });
 }
 
 export async function POST(request: Request) {
@@ -39,6 +43,7 @@ export async function POST(request: Request) {
       title: parsed.data.title,
       description: parsed.data.description || null,
       isPublic: parsed.data.isPublic ?? true,
+      members: { create: { userId: session.user.id, role: "owner" } },
     },
   });
 

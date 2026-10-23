@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -32,6 +33,18 @@ export default async function SettingsPage() {
           initialThemeColor={(user?.themeColor ?? "coral") as ThemeColorId}
           initialThemeMode={(user?.themeMode ?? "dark") as ThemeMode}
         />
+        <section className="border-t border-border pt-8">
+          <h2 className="mb-1 text-lg font-medium">Listening history</h2>
+          <p className="mb-3 text-sm text-muted">
+            Import your scrobbles from Last.fm to fill your diary and stats.
+          </p>
+          <Link
+            href="/settings/import"
+            className="inline-flex rounded-full border border-border px-4 py-1.5 text-sm text-foreground hover:border-accent"
+          >
+            Import from Last.fm
+          </Link>
+        </section>
         <div className="border-t border-border pt-8">
           <PreferencesForm
             initial={{

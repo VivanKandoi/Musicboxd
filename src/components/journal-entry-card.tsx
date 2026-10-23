@@ -17,6 +17,8 @@ export type JournalLog = {
   isRelisten: boolean;
   album: { id: string; title: string; coverUrl: string | null; artist: { name: string } };
   contextTags: { tag: { name: string } }[];
+  source?: string;
+  playCount?: number | null;
 };
 
 export function JournalEntryCard({
@@ -98,7 +100,11 @@ export function JournalEntryCard({
             >
               {log.album.title}
             </Link>
-            <p className="truncate text-xs text-muted">{log.album.artist.name}</p>
+            <p className="truncate text-xs text-muted">
+              {log.album.artist.name}
+              {log.source === "lastfm" &&
+                ` · via Last.fm${log.playCount ? ` (${log.playCount} ${log.playCount === 1 ? "play" : "plays"})` : ""}`}
+            </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {log.rating != null && <StarRating value={log.rating} readOnly size="sm" />}

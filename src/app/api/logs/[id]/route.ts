@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logSchema } from "@/lib/validations";
 import { syncLogTags } from "@/lib/tags";
+import { invalidateYearStats } from "@/lib/year-in-review";
 
 export async function GET(
   _request: Request,
@@ -55,6 +56,10 @@ export async function PATCH(
   if (tags !== undefined) {
     await syncLogTags(id, tags);
   }
+  await invalidateYearStats(session.user.id, [
+    existing.listenedAt.getUTCFullYear(),
+    log.listenedAt.getUTCFullYear(),
+  ]);
 
   return NextResponse.json(log);
 }
@@ -75,5 +80,6 @@ export async function DELETE(
   }
 
   await prisma.log.delete({ where: { id } });
+  await invalidateYearStats(session.user.id, [existing.listenedAt.getUTCFullYear()]);
   return NextResponse.json({ ok: true });
 }

@@ -15,16 +15,28 @@ export default async function UserListsPage({ params }: PageProps<"/u/[username]
 
   const isOwnLists = session?.user?.id === user.id;
 
+  const viewerId = session?.user?.id;
   const lists = await prisma.rankedList.findMany({
-    where: { userId: user.id, ...(isOwnLists ? {} : { isPublic: true }) },
+    where: {
+      members: { some: { userId: user.id } },
+      ...(isOwnLists
+        ? {}
+        : {
+            OR: [
+              { isPublic: true },
+              ...(viewerId ? [{ members: { some: { userId: viewerId } } }] : []),
+            ],
+          }),
+    },
     orderBy: { updatedAt: "desc" },
     include: {
       items: {
-        orderBy: { position: "asc" },
+        orderBy: { rank: "asc" },
         take: 4,
         include: { album: { select: { coverUrl: true, title: true } } },
       },
-      _count: { select: { items: true } },
+      members: { where: { userId: user.id }, select: { role: true } },
+      _count: { select: { items: true, members: true } },
     },
   });
 
@@ -74,6 +86,9 @@ export default async function UserListsPage({ params }: PageProps<"/u/[username]
               </div>
               <p className="text-xs text-muted">
                 {list._count.items} {list._count.items === 1 ? "album" : "albums"}
+                {list.members[0]?.role === "editor"
+                  ? " · Collaborator"
+                  : list._count.members > 1 && " · Shared"}
                 {!list.isPublic && " · Private"}
               </p>
             </Link>

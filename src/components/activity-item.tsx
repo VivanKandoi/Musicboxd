@@ -29,6 +29,8 @@ export type ActivityLog = {
   _count: { likes: number; comments: number };
   likedByMe: boolean;
   contextTags: { tag: { name: string } }[];
+  source?: string;
+  playCount?: number | null;
 };
 
 function timeAgo(date: string | Date) {
@@ -181,7 +183,7 @@ export function ActivityItem({
             >
               {log.user.name || log.user.username}
             </Link>{" "}
-            {log.isRelisten ? "relistened to" : "logged"}{" "}
+            {log.source === "lastfm" ? "listened to" : log.isRelisten ? "relistened to" : "logged"}{" "}
             <Link
               href={`/album/${log.album.id}`}
               className="text-foreground hover:text-accent"
@@ -229,6 +231,11 @@ export function ActivityItem({
 
         <div className="mt-2 flex items-center gap-4 text-xs text-muted">
           <span>{timeAgo(log.listenedAt)}</span>
+          {log.source === "lastfm" && (
+            <span>
+              via Last.fm{log.playCount ? ` · ${log.playCount} ${log.playCount === 1 ? "play" : "plays"}` : ""}
+            </span>
+          )}
           <button
             type="button"
             onClick={toggleLike}

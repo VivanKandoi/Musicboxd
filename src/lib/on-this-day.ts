@@ -6,7 +6,11 @@ export async function getOnThisDay(userId: string) {
   const day = now.getDate();
 
   const candidates = await prisma.log.findMany({
-    where: { userId, listenedAt: { lt: new Date(now.getFullYear(), now.getMonth(), now.getDate()) } },
+    where: {
+      userId,
+      undated: false,
+      listenedAt: { lt: new Date(now.getFullYear(), now.getMonth(), now.getDate()) },
+    },
     orderBy: { listenedAt: "desc" },
     include: {
       album: {

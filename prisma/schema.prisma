@@ -42,6 +42,13 @@ model User {
 
   notifications      Notification[] @relation("notifUser")
   notificationsCaused Notification[] @relation("notifActor")
+
+  listMemberships ListMember[]
+  listInvites     ListInvite[]
+  listItemsAdded  RankedListItem[] @relation("listItemAddedBy")
+  yearStats       YearStats[]
+  importJobs      ImportJob[]
+  importReviews   ImportReviewItem[]
 }
 
 model Follow {
@@ -157,6 +164,11 @@ model Log {
   listenedAt DateTime @default(now())
   isRelisten Boolean  @default(false)
   createdAt  DateTime @default(now())
+  source     String   @default("manual") // manual | lastfm
+  playCount  Int?
+  importKey  String?  @unique
+  // Imported all-time plays with no real date: excluded from date-based views.
+  undated    Boolean  @default(false)
 
   likes    Like[]
   comments Comment[]
@@ -167,6 +179,7 @@ model Log {
   @@index([userId])
   @@index([albumId])
   @@index([userId, createdAt])
+  @@index([userId, listenedAt])
 }
 
 model Like {
@@ -250,22 +263,103 @@ model RankedList {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  items RankedListItem[]
+  items   RankedListItem[]
+  members ListMember[]
+  invites ListInvite[]
 
   @@index([userId])
 }
 
 model RankedListItem {
-  id       String     @id @default(cuid())
-  list     RankedList @relation(fields: [listId], references: [id], onDelete: Cascade)
-  listId   String
-  album    Album      @relation(fields: [albumId], references: [id])
-  albumId  String
-  position Int
-  note     String?
+  id        String     @id @default(cuid())
+  list      RankedList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listId    String
+  album     Album      @relation(fields: [albumId], references: [id])
+  albumId   String
+  rank      String // fractional index: reordering rewrites only the moved row
+  note      String?
+  addedBy   User?      @relation("listItemAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+  addedById String?
+  createdAt DateTime   @default(now())
 
   @@unique([listId, albumId])
-  @@index([listId, position])
+  @@index([listId, rank])
+}
+
+model ListMember {
+  list      RankedList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  role      String // owner | editor
+  createdAt DateTime   @default(now())
+
+  @@id([listId, userId])
+  @@index([userId])
+}
+
+model ListInvite {
+  id          String     @id @default(cuid())
+  token       String     @unique
+  list        RankedList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listId      String
+  createdBy   User       @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdById String
+  createdAt   DateTime   @default(now())
+  revokedAt   DateTime?
+
+  @@index([listId])
+}
+
+model YearStats {
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  year       Int
+  data       Json
+  computedAt DateTime @default(now())
+
+  @@id([userId, year])
+}
+
+model ImportJob {
+  id             String    @id @default(cuid())
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  source         String    @default("lastfm")
+  externalUser   String
+  status         String    @default("pending") // pending | running | done | failed
+  stage          String?
+  total          Int       @default(0)
+  processed      Int       @default(0)
+  matched        Int       @default(0)
+  queued         Int       @default(0)
+  unmatched      Int       @default(0)
+  listensCreated Int       @default(0)
+  error          String?
+  createdAt      DateTime  @default(now())
+  finishedAt     DateTime?
+
+  reviewItems ImportReviewItem[]
+
+  @@index([userId, createdAt])
+}
+
+model ImportReviewItem {
+  id              String    @id @default(cuid())
+  job             ImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobId           String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  artistName      String
+  albumTitle      String
+  playCount       Int       @default(0)
+  listens         Json // [{ day: "YYYY-MM-DD", plays: n }] for dated scrobbles
+  candidates      Json // [{ albumId, title, artist, score }]
+  status          String    @default("pending") // pending | accepted | rejected
+  resolvedAlbumId String?
+  createdAt       DateTime  @default(now())
+
+  @@index([userId, status])
 }
 
 model ContextTag {

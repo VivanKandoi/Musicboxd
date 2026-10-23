@@ -69,8 +69,21 @@ export const rankedListItemSchema = z.object({
   note: z.string().max(280).nullable().optional(),
 });
 
-export const reorderSchema = z.object({
-  itemIds: z.array(z.string().min(1)).min(1),
+export const moveItemSchema = z.object({
+  afterItemId: z.string().min(1).nullable(),
+});
+
+export const lastfmImportSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .min(2)
+    .max(32)
+    .regex(/^[a-zA-Z0-9_-]+$/, "That doesn't look like a Last.fm username"),
+});
+
+export const reviewDecisionSchema = z.object({
+  albumId: z.string().min(1).nullable(),
 });
 
 export const messageSchema = z.object({

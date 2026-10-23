@@ -261,6 +261,9 @@ function ProfileHeader({
             <Link href={`/u/${user.username}/lists`} className="hover:text-foreground">
               Lists
             </Link>
+            <Link href={`/u/${user.username}/year`} className="hover:text-foreground">
+              Year in review
+            </Link>
           </div>
         </div>
       </div>

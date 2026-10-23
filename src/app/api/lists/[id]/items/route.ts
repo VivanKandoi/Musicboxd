@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rankedListItemSchema } from "@/lib/validations";
+import { getListAccess, rankAtEnd } from "@/lib/list-access";
 
 export async function POST(
   request: Request,
@@ -13,8 +14,8 @@ export async function POST(
   }
   const { id: listId } = await params;
 
-  const list = await prisma.rankedList.findUnique({ where: { id: listId } });
-  if (!list || list.userId !== session.user.id) {
+  const access = await getListAccess(listId, session.user.id);
+  if (!access?.canEditItems) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -39,17 +40,13 @@ export async function POST(
     return NextResponse.json({ error: "Already in this list" }, { status: 400 });
   }
 
-  const maxPosition = await prisma.rankedListItem.aggregate({
-    where: { listId },
-    _max: { position: true },
-  });
-
   const item = await prisma.rankedListItem.create({
     data: {
       listId,
       albumId: parsed.data.albumId,
       note: parsed.data.note || null,
-      position: (maxPosition._max.position ?? 0) + 1,
+      rank: await rankAtEnd(listId),
+      addedById: session.user.id,
     },
   });
 

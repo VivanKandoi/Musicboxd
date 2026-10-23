@@ -2,44 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rankedListSchema } from "@/lib/validations";
-
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-  const session = await auth();
-
-  const list = await prisma.rankedList.findUnique({
-    where: { id },
-    include: {
-      user: { select: { username: true, name: true, avatarUrl: true } },
-      items: {
-        orderBy: { position: "asc" },
-        include: {
-          album: {
-            select: {
-              id: true,
-              title: true,
-              coverUrl: true,
-              artist: { select: { name: true } },
-            },
-          },
-        },
-      },
-    },
-  });
-  if (!list) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const isOwner = session?.user?.id === list.userId;
-  if (!list.isPublic && !isOwner) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({ list, isOwner });
-}
+import { getListAccess } from "@/lib/list-access";
 
 export async function PATCH(
   request: Request,
@@ -51,8 +14,8 @@ export async function PATCH(
   }
   const { id } = await params;
 
-  const existing = await prisma.rankedList.findUnique({ where: { id } });
-  if (!existing || existing.userId !== session.user.id) {
+  const access = await getListAccess(id, session.user.id);
+  if (!access?.canManage) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -65,11 +28,7 @@ export async function PATCH(
     );
   }
 
-  const list = await prisma.rankedList.update({
-    where: { id },
-    data: parsed.data,
-  });
-
+  const list = await prisma.rankedList.update({ where: { id }, data: parsed.data });
   return NextResponse.json(list);
 }
 
@@ -83,8 +42,8 @@ export async function DELETE(
   }
   const { id } = await params;
 
-  const existing = await prisma.rankedList.findUnique({ where: { id } });
-  if (!existing || existing.userId !== session.user.id) {
+  const access = await getListAccess(id, session.user.id);
+  if (!access?.canManage) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

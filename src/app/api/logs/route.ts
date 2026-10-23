@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logSchema } from "@/lib/validations";
 import { syncLogTags } from "@/lib/tags";
+import { invalidateYearStats } from "@/lib/year-in-review";
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
   if (tags) {
     await syncLogTags(log.id, tags);
   }
+  await invalidateYearStats(session.user.id, [log.listenedAt.getUTCFullYear()]);
 
   return NextResponse.json(log, { status: 201 });
 }

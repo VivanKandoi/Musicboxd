@@ -51,6 +51,7 @@ export async function getFeedLogs(
   const logs = await prisma.log.findMany({
     where: {
       userId: scopedUserId ?? { in: followedUserIds },
+      source: "manual",
       ...(filters.albumId ? { albumId: filters.albumId } : {}),
       ...(filters.artistId ? { album: { artistId: filters.artistId } } : {}),
     },
@@ -63,7 +64,7 @@ export async function getFeedLogs(
 
 export async function getFriendsListening(followedUserIds: string[]) {
   const logs = await prisma.log.findMany({
-    where: { userId: { in: followedUserIds } },
+    where: { userId: { in: followedUserIds }, source: "manual" },
     orderBy: { createdAt: "desc" },
     take: 60,
     include: {
@@ -99,7 +100,7 @@ export async function getRecentAlbums(take = 12) {
 
 export async function getUserDiary(userId: string, viewerId: string | null, take = 50) {
   const logs = await prisma.log.findMany({
-    where: { userId },
+    where: { userId, undated: false },
     orderBy: { listenedAt: "desc" },
     take,
     include: logInclude,
@@ -149,18 +150,21 @@ export async function getMonthlyJournalStats(userId: string) {
 
   const [thisMonthLogs, lastMonthCount, genreRows] = await Promise.all([
     prisma.log.findMany({
-      where: { userId, createdAt: { gte: startOfThisMonth } },
+      where: { userId, undated: false, createdAt: { gte: startOfThisMonth } },
       select: { rating: true, albumId: true },
     }),
     prisma.log.count({
       where: {
         userId,
+        undated: false,
         createdAt: { gte: startOfLastMonth, lt: startOfThisMonth },
       },
     }),
     prisma.albumGenre.findMany({
       where: {
-        album: { logs: { some: { userId, createdAt: { gte: startOfThisMonth } } } },
+        album: {
+          logs: { some: { userId, undated: false, createdAt: { gte: startOfThisMonth } } },
+        },
       },
       select: { genre: { select: { name: true } } },
     }),
@@ -414,7 +418,7 @@ export async function getTrendingAlbums(take = 5) {
   const since = new Date(Date.now() - 30 * 86400000);
   const grouped = await prisma.log.groupBy({
     by: ["albumId"],
-    where: { createdAt: { gte: since } },
+    where: { source: "manual", createdAt: { gte: since } },
     _count: { albumId: true },
     orderBy: { _count: { albumId: "desc" } },
     take,
