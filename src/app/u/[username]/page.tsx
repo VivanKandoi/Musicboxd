@@ -7,6 +7,7 @@ import { Lock } from "lucide-react";
 import { getUserDiary, getUserStats } from "@/lib/queries";
 import { computeBadges } from "@/lib/badges";
 import { getCompatibility } from "@/lib/compatibility";
+import { applyCustomCovers } from "@/lib/entitlements";
 import { FollowButton } from "@/components/follow-button";
 import { EditProfileForm } from "@/components/edit-profile-form";
 import { FiveFavesEditor } from "@/components/five-faves-editor";
@@ -64,6 +65,10 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
         computeBadges(user.id),
       ])
     : [null, null, null];
+  await Promise.all([
+    applyCustomCovers(session?.user?.id, user.fiveFaves, (f) => f.album),
+    applyCustomCovers(session?.user?.id, diary ?? [], (log) => log.album),
+  ]);
 
   if (!canViewPrivateContent) {
     return (

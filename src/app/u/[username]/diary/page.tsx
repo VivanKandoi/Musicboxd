@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getUserDiary, getMonthlyJournalStats } from "@/lib/queries";
 import { JournalEntryCard } from "@/components/journal-entry-card";
+import { applyCustomCovers } from "@/lib/entitlements";
 
 function formatGroupHeading(date: Date) {
   const today = new Date();
@@ -57,6 +58,7 @@ export default async function DiaryPage({ params }: PageProps<"/u/[username]/dia
     getUserDiary(user.id, session?.user?.id ?? null, 200),
     getMonthlyJournalStats(user.id),
   ]);
+  await applyCustomCovers(session?.user?.id, diary, (log) => log.album);
 
   const groups: { key: string; heading: string; logs: typeof diary }[] = [];
   for (const log of diary) {

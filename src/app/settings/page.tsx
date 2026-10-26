@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SettingsForm } from "@/components/settings-form";
 import { PreferencesForm } from "@/components/preferences-form";
+import { PremiumToggle } from "@/components/premium-toggle";
+import { isPremium, PREMIUM_FEATURES } from "@/lib/entitlements";
 import type { ThemeColorId, ThemeMode } from "@/lib/theme";
 
 export default async function SettingsPage() {
@@ -21,9 +23,12 @@ export default async function SettingsPage() {
       notifyOnLike: true,
       notifyOnComment: true,
       notifyOnMessage: true,
+      notifyOnRelease: true,
+      notifyOnAnniversary: true,
       emailNotifications: true,
     },
   });
+  const premium = await isPremium(session.user.id);
 
   return (
     <div className="max-w-lg">
@@ -46,6 +51,9 @@ export default async function SettingsPage() {
           </Link>
         </section>
         <div className="border-t border-border pt-8">
+          <PremiumToggle initialEnabled={premium} features={Object.values(PREMIUM_FEATURES)} />
+        </div>
+        <div className="border-t border-border pt-8">
           <PreferencesForm
             initial={{
               isPrivate: user?.isPrivate ?? false,
@@ -54,6 +62,8 @@ export default async function SettingsPage() {
               notifyOnLike: user?.notifyOnLike ?? true,
               notifyOnComment: user?.notifyOnComment ?? true,
               notifyOnMessage: user?.notifyOnMessage ?? true,
+              notifyOnRelease: user?.notifyOnRelease ?? true,
+              notifyOnAnniversary: user?.notifyOnAnniversary ?? true,
               emailNotifications: user?.emailNotifications ?? true,
             }}
           />

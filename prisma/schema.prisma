@@ -25,6 +25,8 @@ model User {
   notifyOnLike       Boolean @default(true)
   notifyOnComment    Boolean @default(true)
   notifyOnMessage    Boolean @default(true)
+  notifyOnRelease    Boolean @default(true)
+  notifyOnAnniversary Boolean @default(true)
   emailNotifications Boolean @default(true)
 
   logs         Log[]
@@ -37,8 +39,8 @@ model User {
   following Follow[] @relation("follower")
   followers Follow[] @relation("following")
 
-  sentMessages     Message[] @relation("sentMessages")
-  receivedMessages Message[] @relation("receivedMessages")
+  sentMessages     Message[]                 @relation("sentMessages")
+  conversations    ConversationParticipant[]
 
   notifications      Notification[] @relation("notifUser")
   notificationsCaused Notification[] @relation("notifActor")
@@ -49,6 +51,44 @@ model User {
   yearStats       YearStats[]
   importJobs      ImportJob[]
   importReviews   ImportReviewItem[]
+  entitlements    Entitlement[]
+  customCovers    CustomCover[]
+  artistFollows   ArtistFollow[]
+}
+
+model ArtistFollow {
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  artist    Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  artistId  String
+  createdAt DateTime @default(now())
+
+  @@id([userId, artistId])
+  @@index([artistId])
+}
+
+// Premium features a user has. Checked only through src/lib/entitlements.ts.
+// source = "mock" for the demo toggle; a real billing integration would add its own.
+model Entitlement {
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  feature   String // e.g. custom_covers
+  source    String   @default("mock")
+  grantedAt DateTime @default(now())
+
+  @@id([userId, feature])
+}
+
+// A per-user cover override, shown only in that user's own views.
+model CustomCover {
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  album     Album    @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  albumId   String
+  imageUrl  String
+  createdAt DateTime @default(now())
+
+  @@id([userId, albumId])
 }
 
 model Follow {
@@ -71,6 +111,9 @@ model Artist {
   discogsId      String? @unique
   musicbrainzId  String? @unique
   albums         Album[]
+  followers      ArtistFollow[]
+  // last time the release-calendar job checked MusicBrainz for new release groups
+  releasesCheckedAt DateTime?
 }
 
 model Genre {
@@ -108,6 +151,8 @@ model Album {
   fiveFaves FiveFave[]
   rankedListItems RankedListItem[]
   sharedInMessages Message[]
+  customCovers    CustomCover[]
+  notifications   Notification[]
 
   @@index([artistId])
   @@index([title])
@@ -218,23 +263,50 @@ model FiveFave {
   @@unique([userId, albumId])
 }
 
-model Message {
-  id            String    @id @default(cuid())
-  sender        User      @relation("sentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  senderId      String
-  recipient     User      @relation("receivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
-  recipientId   String
-  text          String?
-  sharedAlbum   Album?    @relation(fields: [sharedAlbumId], references: [id], onDelete: SetNull)
-  sharedAlbumId String?
-  sharedLog     Log?      @relation(fields: [sharedLogId], references: [id], onDelete: SetNull)
-  sharedLogId   String?
-  readAt        DateTime?
-  createdAt     DateTime  @default(now())
+// Messages live in conversations rather than sender/recipient pairs, so group chat is
+// mostly UI work: a group is a conversation with isGroup = true and more participants.
+model Conversation {
+  id        String   @id @default(cuid())
+  isGroup   Boolean  @default(false)
+  title     String?
+  // "<userIdA>:<userIdB>" (sorted) for 1:1 chats, so each pair has exactly one conversation
+  directKey String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) // time of the latest message
 
-  @@index([senderId, recipientId])
-  @@index([recipientId, senderId])
-  @@index([recipientId, readAt])
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([updatedAt])
+}
+
+model ConversationParticipant {
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  joinedAt       DateTime     @default(now())
+  lastReadAt     DateTime?
+
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  sender         User         @relation("sentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId       String
+  text           String?
+  sharedAlbum    Album?       @relation(fields: [sharedAlbumId], references: [id], onDelete: SetNull)
+  sharedAlbumId  String?
+  sharedLog      Log?         @relation(fields: [sharedLogId], references: [id], onDelete: SetNull)
+  sharedLogId    String?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
 }
 
 model Notification {
@@ -243,9 +315,13 @@ model Notification {
   userId    String
   actor     User?    @relation("notifActor", fields: [actorId], references: [id], onDelete: SetNull)
   actorId   String?
-  type      String // follow | like | comment | message
+  type      String // follow | like | comment | message | release | anniversary | reissue
   log       Log?     @relation(fields: [logId], references: [id], onDelete: Cascade)
   logId     String?
+  album     Album?   @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  albumId   String?
+  // set by scheduled jobs so re-running them never notifies twice
+  dedupeKey String?  @unique
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 

@@ -55,6 +55,8 @@ export const preferencesSchema = z.object({
   notifyOnLike: z.boolean().optional(),
   notifyOnComment: z.boolean().optional(),
   notifyOnMessage: z.boolean().optional(),
+  notifyOnRelease: z.boolean().optional(),
+  notifyOnAnniversary: z.boolean().optional(),
   emailNotifications: z.boolean().optional(),
 });
 

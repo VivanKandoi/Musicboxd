@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { messageSchema } from "@/lib/validations";
-import { canMessage } from "@/lib/dm";
+import {
+  canMessage,
+  findDirectConversation,
+  getOrCreateDirectConversation,
+  markConversationRead,
+} from "@/lib/dm";
 import { createNotification } from "@/lib/notifications";
 
 const messageInclude = {
@@ -35,21 +40,15 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const messages = await prisma.message.findMany({
-    where: {
-      OR: [
-        { senderId: session.user.id, recipientId: other.id },
-        { senderId: other.id, recipientId: session.user.id },
-      ],
-    },
-    orderBy: { createdAt: "asc" },
-    include: messageInclude,
-  });
-
-  await prisma.message.updateMany({
-    where: { senderId: other.id, recipientId: session.user.id, readAt: null },
-    data: { readAt: new Date() },
-  });
+  const conversation = await findDirectConversation(session.user.id, other.id);
+  const messages = conversation
+    ? await prisma.message.findMany({
+        where: { conversationId: conversation.id },
+        orderBy: { createdAt: "asc" },
+        include: messageInclude,
+      })
+    : [];
+  if (conversation) await markConversationRead(conversation.id, session.user.id);
 
   return NextResponse.json({
     messages,
@@ -92,16 +91,24 @@ export async function POST(
     );
   }
 
-  const message = await prisma.message.create({
-    data: {
-      senderId: session.user.id,
-      recipientId: recipient.id,
-      text: parsed.data.text || null,
-      sharedAlbumId: parsed.data.sharedAlbumId || null,
-      sharedLogId: parsed.data.sharedLogId || null,
-    },
-    include: messageInclude,
-  });
+  const conversation = await getOrCreateDirectConversation(session.user.id, recipient.id);
+  const [message] = await prisma.$transaction([
+    prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: session.user.id,
+        text: parsed.data.text || null,
+        sharedAlbumId: parsed.data.sharedAlbumId || null,
+        sharedLogId: parsed.data.sharedLogId || null,
+      },
+      include: messageInclude,
+    }),
+    prisma.conversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } }),
+    prisma.conversationParticipant.update({
+      where: { conversationId_userId: { conversationId: conversation.id, userId: session.user.id } },
+      data: { lastReadAt: new Date() },
+    }),
+  ]);
 
   await createNotification({
     userId: recipient.id,

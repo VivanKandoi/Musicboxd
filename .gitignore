@@ -52,3 +52,6 @@ prisma/dev.db-journal
 
 # local Claude Code tooling config (not part of the app)
 /.claude/
+
+# per-user uploads served through API routes
+/uploads/

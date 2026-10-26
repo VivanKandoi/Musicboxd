@@ -72,7 +72,7 @@ export function AddToListButton({ albumId }: { albumId: string }) {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-20 mt-2 w-64 rounded-lg border border-border bg-surface p-2 shadow-lg">
+          <div className="fixed inset-x-4 bottom-20 z-40 rounded-lg border border-border bg-surface p-2 shadow-lg sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:z-20 sm:mt-2 sm:w-64">
             {lists === null ? (
               <p className="px-2 py-2 text-xs text-muted">Loading…</p>
             ) : lists.length === 0 ? (

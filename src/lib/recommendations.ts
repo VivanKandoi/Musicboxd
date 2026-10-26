@@ -8,105 +8,168 @@ export type Recommendation = {
   reasons: string[];
 };
 
-export async function getRecommendations(userId: string, take = 6): Promise<Recommendation[]> {
-  const lovedLogs = await prisma.log.findMany({
-    where: { userId, rating: { gte: 4 } },
-    select: { albumId: true },
-  });
-  const lovedAlbumIds = [...new Set(lovedLogs.map((l) => l.albumId))];
-  if (lovedAlbumIds.length === 0) return [];
+export type CatalogEntry = {
+  id: string;
+  title: string;
+  coverUrl: string | null;
+  artistId: string;
+  artistName: string;
+  genres: { id: string; name: string }[];
+};
 
-  const loggedAlbumIds = await prisma.log
-    .findMany({ where: { userId }, select: { albumId: true }, distinct: ["albumId"] })
-    .then((rows) => rows.map((r) => r.albumId));
+export type ListenSignal = {
+  userId: string;
+  albumId: string;
+  rating: number | null;
+  source: string;
+  playCount: number | null;
+};
 
-  const genreRows = await prisma.albumGenre.findMany({
-    where: { albumId: { in: lovedAlbumIds } },
-    select: { genreId: true, genre: { select: { name: true } } },
-  });
-  const genreCounts = new Map<string, { name: string; count: number }>();
-  for (const r of genreRows) {
-    const entry = genreCounts.get(r.genreId) ?? { name: r.genre.name, count: 0 };
-    entry.count += 1;
-    genreCounts.set(r.genreId, entry);
+const LOVED_RATING = 4;
+// Imported listens carry no rating, so heavy play counts stand in as an implicit "loved".
+const LOVED_IMPORTED_PLAYS = 5;
+const TOP_GENRES = 6;
+
+export function lovedAlbumIds(listens: ListenSignal[]) {
+  const plays = new Map<string, number>();
+  const loved = new Set<string>();
+  for (const l of listens) {
+    if (l.rating != null && l.rating >= LOVED_RATING) loved.add(l.albumId);
+    if (l.source !== "manual") plays.set(l.albumId, (plays.get(l.albumId) ?? 0) + (l.playCount ?? 1));
   }
-  const topGenreIds = Array.from(genreCounts.entries())
-    .sort((a, b) => b[1].count - a[1].count)
-    .slice(0, 6)
-    .map(([id]) => id);
+  for (const [albumId, n] of plays) if (n >= LOVED_IMPORTED_PLAYS) loved.add(albumId);
+  return loved;
+}
 
-  const lovedAlbums = await prisma.album.findMany({
-    where: { id: { in: lovedAlbumIds } },
-    select: { artistId: true },
-  });
-  const lovedArtistIds = [...new Set(lovedAlbums.map((a) => a.artistId))];
+// The "You'll also enjoy" ranker as a pure function, so the app and the offline evaluation
+// (scripts/eval-recommendations.ts) run exactly the same algorithm.
+// Score = 2 per shared top genre + 3 if by a loved artist + 1 per similar listener who loved it.
+// Ties are broken by popularity (distinct listeners), then title.
+export function recommend(
+  userListens: ListenSignal[],
+  otherLovedByUser: Map<string, Set<string>>,
+  catalog: Map<string, CatalogEntry>,
+  take = 6,
+  popularity: Map<string, number> = new Map()
+): Recommendation[] {
+  const loved = lovedAlbumIds(userListens);
+  if (loved.size === 0) return [];
+  const logged = new Set(userListens.map((l) => l.albumId));
 
-  const similarUserRows = await prisma.log.findMany({
-    where: { albumId: { in: lovedAlbumIds }, rating: { gte: 4 }, userId: { not: userId } },
-    select: { userId: true },
-  });
-  const similarUserIds = [...new Set(similarUserRows.map((r) => r.userId))];
+  const genreCounts = new Map<string, number>();
+  const lovedArtists = new Set<string>();
+  for (const albumId of loved) {
+    const album = catalog.get(albumId);
+    if (!album) continue;
+    lovedArtists.add(album.artistId);
+    for (const g of album.genres) genreCounts.set(g.id, (genreCounts.get(g.id) ?? 0) + 1);
+  }
+  const topGenres = new Set(
+    [...genreCounts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, TOP_GENRES)
+      .map(([id]) => id)
+  );
 
-  const similarLovedRows = similarUserIds.length
-    ? await prisma.log.findMany({
-        where: {
-          userId: { in: similarUserIds },
-          rating: { gte: 4 },
-          albumId: { notIn: loggedAlbumIds },
-        },
-        select: { albumId: true },
-      })
-    : [];
-  const similarLovedCounts = new Map<string, number>();
-  for (const r of similarLovedRows) {
-    similarLovedCounts.set(r.albumId, (similarLovedCounts.get(r.albumId) ?? 0) + 1);
+  const similarLoved = new Map<string, number>();
+  for (const theirLoved of otherLovedByUser.values()) {
+    if (![...loved].some((id) => theirLoved.has(id))) continue;
+    for (const id of theirLoved) {
+      if (!logged.has(id)) similarLoved.set(id, (similarLoved.get(id) ?? 0) + 1);
+    }
   }
 
-  const candidates = await prisma.album.findMany({
-    where: {
-      id: { notIn: loggedAlbumIds },
-      OR: [
-        { genres: { some: { genreId: { in: topGenreIds } } } },
-        { artistId: { in: lovedArtistIds } },
-        { id: { in: Array.from(similarLovedCounts.keys()) } },
-      ],
-    },
+  const scored: { album: CatalogEntry; score: number; reasons: string[] }[] = [];
+  for (const album of catalog.values()) {
+    if (logged.has(album.id)) continue;
+    const matchedGenres = album.genres.filter((g) => topGenres.has(g.id)).map((g) => g.name);
+    const artistMatch = lovedArtists.has(album.artistId);
+    const similar = similarLoved.get(album.id) ?? 0;
+    const score = matchedGenres.length * 2 + (artistMatch ? 3 : 0) + similar;
+    if (score === 0) continue;
+
+    const reasons: string[] = [];
+    if (artistMatch) reasons.push(`More from ${album.artistName}`);
+    if (matchedGenres.length > 0) reasons.push(`Shares genre: ${matchedGenres[0]}`);
+    if (similar > 0) reasons.push("Loved by listeners with similar taste");
+    scored.push({ album, score, reasons });
+  }
+
+  return scored
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        (popularity.get(b.album.id) ?? 0) - (popularity.get(a.album.id) ?? 0) ||
+        a.album.title.localeCompare(b.album.title)
+    )
+    .slice(0, take)
+    .map(({ album, reasons }) => ({
+      id: album.id,
+      title: album.title,
+      coverUrl: album.coverUrl,
+      artist: album.artistName,
+      reasons,
+    }));
+}
+
+const CATALOG_TTL_MS = 10 * 60 * 1000;
+let catalogCache: { at: number; catalog: Map<string, CatalogEntry> } | null = null;
+
+export async function loadCatalogIndex() {
+  if (catalogCache && Date.now() - catalogCache.at < CATALOG_TTL_MS) return catalogCache.catalog;
+  const albums = await prisma.album.findMany({
+    where: { OR: [{ releaseDate: null }, { releaseDate: { lte: new Date() } }] },
     select: {
       id: true,
       title: true,
       coverUrl: true,
       artistId: true,
       artist: { select: { name: true } },
-      genres: { select: { genreId: true, genre: { select: { name: true } } } },
+      genres: { select: { genre: { select: { id: true, name: true } } } },
     },
-    take: 300,
   });
+  const catalog = new Map(
+    albums.map((a) => [
+      a.id,
+      {
+        id: a.id,
+        title: a.title,
+        coverUrl: a.coverUrl,
+        artistId: a.artistId,
+        artistName: a.artist.name,
+        genres: a.genres.map((g) => g.genre),
+      },
+    ])
+  );
+  catalogCache = { at: Date.now(), catalog };
+  return catalog;
+}
 
-  const scored = candidates.map((c) => {
-    const matchedGenres = c.genres
-      .filter((g) => topGenreIds.includes(g.genreId))
-      .map((g) => g.genre.name);
-    const artistMatch = lovedArtistIds.includes(c.artistId);
-    const similarBoost = similarLovedCounts.get(c.id) ?? 0;
-    const score = matchedGenres.length * 2 + (artistMatch ? 3 : 0) + similarBoost;
+const signalSelect = { userId: true, albumId: true, rating: true, source: true, playCount: true } as const;
 
-    const reasons: string[] = [];
-    if (artistMatch) reasons.push(`More from ${c.artist.name}`);
-    if (matchedGenres.length > 0) reasons.push(`Shares genre: ${matchedGenres[0]}`);
-    if (similarBoost > 0) reasons.push("Loved by listeners with similar taste");
+export async function getRecommendations(userId: string, take = 6): Promise<Recommendation[]> {
+  const userListens = await prisma.log.findMany({ where: { userId }, select: signalSelect });
+  if (lovedAlbumIds(userListens).size === 0) return [];
 
-    return { c, score, reasons };
-  });
+  const [others, catalog, popularity] = await Promise.all([
+    prisma.log.findMany({
+      where: { userId: { not: userId }, OR: [{ rating: { gte: LOVED_RATING } }, { source: { not: "manual" } }] },
+      select: signalSelect,
+    }),
+    loadCatalogIndex(),
+    albumPopularity(),
+  ]);
 
-  return scored
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, take)
-    .map(({ c, reasons }) => ({
-      id: c.id,
-      title: c.title,
-      coverUrl: c.coverUrl,
-      artist: c.artist.name,
-      reasons,
-    }));
+  const byUser = new Map<string, ListenSignal[]>();
+  for (const l of others) byUser.set(l.userId, [...(byUser.get(l.userId) ?? []), l]);
+  const otherLoved = new Map([...byUser].map(([id, listens]) => [id, lovedAlbumIds(listens)]));
+
+  return recommend(userListens, otherLoved, catalog, take, popularity);
+}
+
+export async function albumPopularity() {
+  const rows = await prisma.log.findMany({ distinct: ["userId", "albumId"], select: { albumId: true } });
+  const counts = new Map<string, number>();
+  for (const r of rows) counts.set(r.albumId, (counts.get(r.albumId) ?? 0) + 1);
+  return counts;
 }

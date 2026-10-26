@@ -30,6 +30,8 @@ export async function PATCH(request: Request) {
     notifyOnLike: user.notifyOnLike,
     notifyOnComment: user.notifyOnComment,
     notifyOnMessage: user.notifyOnMessage,
+    notifyOnRelease: user.notifyOnRelease,
+    notifyOnAnniversary: user.notifyOnAnniversary,
     emailNotifications: user.emailNotifications,
   });
 }

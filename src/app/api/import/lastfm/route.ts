@@ -39,7 +39,10 @@ export async function POST(request: Request) {
     data: { userId: session.user.id, externalUser: parsed.data.username },
   });
 
-  after(() => runLastfmImport(job.id));
+  // With IMPORT_WORKER=external the job stays queued for `npm run jobs:import-worker`.
+  if (process.env.IMPORT_WORKER !== "external") {
+    after(() => runLastfmImport(job.id));
+  }
 
   return NextResponse.json(job, { status: 202 });
 }

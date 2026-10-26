@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canViewProfileContent } from "@/lib/profile-access";
 import { getYearStats, getYearsWithListens } from "@/lib/year-in-review";
+import { getCoverOverrides } from "@/lib/entitlements";
 import { ShareYearButton } from "@/components/share-year-button";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -60,6 +61,8 @@ export default async function YearInReviewPage({ params }: PageProps<"/u/[userna
   }
 
   const [stats, years] = await Promise.all([getYearStats(user.id, year), getYearsWithListens(user.id)]);
+  const covers = await getCoverOverrides(session?.user?.id, stats.topAlbums.map((a) => a.albumId));
+  stats.topAlbums = stats.topAlbums.map((a) => ({ ...a, coverUrl: covers.get(a.albumId) ?? a.coverUrl }));
   const isOwn = session?.user?.id === user.id;
   const displayName = user.name || user.username;
 

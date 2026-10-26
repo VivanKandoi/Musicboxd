@@ -5,6 +5,9 @@ import Link from "next/link";
 import Image from "next/image";
 
 type Conversation = {
+  conversationId: string;
+  isGroup: boolean;
+  title: string | null;
   user: { id: string; username: string; name: string | null; avatarUrl: string | null };
   lastMessage: { text: string | null; createdAt: string; senderId: string };
   unreadCount: number;
@@ -45,7 +48,7 @@ export function MessagesInbox() {
     <div className="flex flex-col divide-y divide-border rounded-xl border border-border bg-surface">
       {conversations.map((c) => (
         <Link
-          key={c.user.id}
+          key={c.conversationId}
           href={`/messages/${c.user.username}`}
           className="flex items-center gap-3 p-3 hover:bg-surface-2"
         >
@@ -64,7 +67,7 @@ export function MessagesInbox() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-foreground">
-              {c.user.name || c.user.username}
+              {c.isGroup ? c.title ?? "Group chat" : c.user.name || c.user.username}
             </p>
             <p className="truncate text-xs text-muted">{preview(c.lastMessage.text)}</p>
           </div>

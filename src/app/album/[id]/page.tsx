@@ -18,6 +18,8 @@ import { ActivityItem } from "@/components/activity-item";
 import { TrackRatingRow } from "@/components/track-rating-row";
 import { AddToListButton } from "@/components/add-to-list-button";
 import { ShareToDmButton } from "@/components/share-to-dm-button";
+import { CustomCoverControl } from "@/components/custom-cover-control";
+import { applyCustomCovers, hasEntitlement } from "@/lib/entitlements";
 
 function formatDuration(sec: number | null) {
   if (!sec) return "";
@@ -26,8 +28,9 @@ function formatDuration(sec: number | null) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
+export default async function AlbumPage({ params, searchParams }: PageProps<"/album/[id]">) {
   const { id } = await params;
+  const openLogForm = (await searchParams).log === "1";
   const session = await auth();
   const album = await getAlbumDetail(id);
   if (!album) notFound();
@@ -41,24 +44,33 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
       getAlbumPopularTags(id),
     ]);
 
-  const userActivity = session?.user
-    ? await getUserAlbumActivity(session.user.id, id)
-    : null;
+  const viewerId = session?.user?.id;
+  const [userActivity, canCustomize] = await Promise.all([
+    viewerId ? getUserAlbumActivity(viewerId, id) : null,
+    hasEntitlement(viewerId, "custom_covers"),
+  ]);
+  const catalogCover = album.coverUrl;
+  await applyCustomCovers(viewerId, [album], (a) => a);
+  await applyCustomCovers(viewerId, reviews, (log) => log.album);
+  const hasCustomCover = album.coverUrl !== catalogCover;
 
   return (
     <div className="flex flex-col gap-8">
       <div className="rounded-xl border border-border bg-surface p-5">
         <div className="flex flex-col gap-6 sm:flex-row">
-          <div className="relative aspect-square w-full max-w-[220px] shrink-0 overflow-hidden rounded-xl bg-surface-2 ring-1 ring-border">
-            {album.coverUrl && (
-              <Image
-                src={album.coverUrl}
-                alt={album.title}
-                fill
-                sizes="220px"
-                className="object-cover"
-              />
-            )}
+          <div className="flex w-full max-w-[220px] shrink-0 flex-col gap-2">
+            <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-surface-2 ring-1 ring-border">
+              {album.coverUrl && (
+                <Image
+                  src={album.coverUrl}
+                  alt={album.title}
+                  fill
+                  sizes="220px"
+                  className="object-cover"
+                />
+              )}
+            </div>
+            {canCustomize && <CustomCoverControl albumId={album.id} hasCustomCover={hasCustomCover} />}
           </div>
 
           <div className="flex flex-1 flex-col gap-3">
@@ -120,7 +132,11 @@ export default async function AlbumPage({ params }: PageProps<"/album/[id]">) {
               </button>
               {session?.user ? (
                 <>
-                  <LogForm albumId={album.id} hasLoggedBefore={(userActivity?.timesLogged ?? 0) > 0} />
+                  <LogForm
+                    albumId={album.id}
+                    hasLoggedBefore={(userActivity?.timesLogged ?? 0) > 0}
+                    defaultOpen={openLogForm}
+                  />
                   <AddToListButton albumId={album.id} />
                   <ShareToDmButton sharedAlbumId={album.id} label="Share with a friend" />
                 </>

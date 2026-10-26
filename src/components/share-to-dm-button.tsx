@@ -62,7 +62,7 @@ export function ShareToDmButton({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-20 mt-2 w-56 rounded-lg border border-border bg-surface p-2 shadow-lg">
+          <div className="fixed inset-x-4 bottom-20 z-40 rounded-lg border border-border bg-surface p-2 shadow-lg sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:z-20 sm:mt-2 sm:w-56">
             <p className="px-1 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
               Send to
             </p>

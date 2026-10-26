@@ -14,7 +14,10 @@
     "db:import-musicbrainz": "tsx prisma/import-musicbrainz.ts",
     "db:seed-year": "tsx scripts/seed-year-in-review.ts",
     "jobs:year-stats": "tsx scripts/year-stats-job.ts",
-    "eval:year-stats": "tsx scripts/verify-year-stats.ts"
+    "jobs:releases": "tsx scripts/release-calendar-job.ts",
+    "jobs:import-worker": "tsx scripts/import-worker.ts",
+    "eval:year-stats": "tsx scripts/verify-year-stats.ts",
+    "eval:recs": "tsx scripts/eval-recommendations.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

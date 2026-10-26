@@ -12,6 +12,8 @@ type Preferences = {
   notifyOnLike: boolean;
   notifyOnComment: boolean;
   notifyOnMessage: boolean;
+  notifyOnRelease: boolean;
+  notifyOnAnniversary: boolean;
   emailNotifications: boolean;
 };
 
@@ -48,6 +50,7 @@ export function PreferencesForm({ initial }: { initial: Preferences }) {
         <label className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2.5">
           <span className="text-sm text-foreground">Private profile</span>
           <Toggle
+            label="Private profile"
             checked={prefs.isPrivate}
             onChange={(v) => save({ isPrivate: v })}
             disabled={pending}
@@ -107,6 +110,18 @@ export function PreferencesForm({ initial }: { initial: Preferences }) {
             onChange={(v) => save({ notifyOnMessage: v })}
             disabled={pending}
           />
+          <ToggleRow
+            label="New releases from artists you follow"
+            checked={prefs.notifyOnRelease}
+            onChange={(v) => save({ notifyOnRelease: v })}
+            disabled={pending}
+          />
+          <ToggleRow
+            label="Anniversaries and reissues of albums you love"
+            checked={prefs.notifyOnAnniversary}
+            onChange={(v) => save({ notifyOnAnniversary: v })}
+            disabled={pending}
+          />
         </div>
       </section>
 
@@ -145,16 +160,18 @@ function ToggleRow({
   return (
     <label className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2.5">
       <span className="text-sm text-foreground">{label}</span>
-      <Toggle checked={checked} onChange={onChange} disabled={disabled} />
+      <Toggle label={label} checked={checked} onChange={onChange} disabled={disabled} />
     </label>
   );
 }
 
 function Toggle({
+  label,
   checked,
   onChange,
   disabled,
 }: {
+  label: string;
   checked: boolean;
   onChange: (v: boolean) => void;
   disabled: boolean;
@@ -163,6 +180,7 @@ function Toggle({
     <button
       type="button"
       role="switch"
+      aria-label={label}
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}

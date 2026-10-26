@@ -4,7 +4,7 @@ import { Settings } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Logo } from "@/components/nav/logo";
-import { NavLinks } from "@/components/nav/nav-links";
+import { MobileNav, NavLinks } from "@/components/nav/nav-links";
 import { NotificationBell } from "@/components/nav/notification-bell";
 import { MessagesLink } from "@/components/nav/messages-link";
 import { SearchBox } from "@/components/nav/search-box";
@@ -21,6 +21,7 @@ export async function Navbar() {
     : null;
 
   return (
+    <>
     <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3 sm:px-6">
         <Logo />
@@ -69,6 +70,20 @@ export async function Navbar() {
                 >
                   Profile
                 </Link>
+                {[
+                  { href: `/u/${session.user.username}/lists`, label: "Lists" },
+                  { href: "/releases", label: "Release calendar" },
+                  { href: `/u/${session.user.username}/year`, label: "Year in review" },
+                  { href: "/guides", label: "Start Here guides" },
+                ].map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-surface-2"
+                  >
+                    {item.label}
+                  </Link>
+                ))}
                 <div className="my-1 border-t border-border" />
                 <LogoutButton />
               </UserMenu>
@@ -95,5 +110,7 @@ export async function Navbar() {
         <SearchBox />
       </div>
     </header>
+    {session?.user && <MobileNav username={session.user.username} />}
+    </>
   );
 }

@@ -6,9 +6,17 @@ import { Calendar, Repeat } from "lucide-react";
 import { StarRating } from "@/components/star-rating";
 import { TagInput } from "@/components/tag-input";
 
-export function LogForm({ albumId, hasLoggedBefore }: { albumId: string; hasLoggedBefore: boolean }) {
+export function LogForm({
+  albumId,
+  hasLoggedBefore,
+  defaultOpen = false,
+}: {
+  albumId: string;
+  hasLoggedBefore: boolean;
+  defaultOpen?: boolean;
+}) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [rating, setRating] = useState<number | null>(null);
   const [reviewText, setReviewText] = useState("");
   const [listenedAt, setListenedAt] = useState(() =>

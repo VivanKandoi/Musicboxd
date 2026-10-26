@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getListAccess } from "@/lib/list-access";
+import { applyCustomCovers } from "@/lib/entitlements";
 import { ListEditor } from "@/components/list-editor";
 import { ListCollaborators } from "@/components/list-collaborators";
 
@@ -41,6 +42,7 @@ export default async function ListPage({ params }: PageProps<"/lists/[id]">) {
     },
   });
 
+  await applyCustomCovers(session?.user?.id, list.items, (item) => item.album);
   const editors = list.members.filter((m) => m.role === "editor");
 
   return (

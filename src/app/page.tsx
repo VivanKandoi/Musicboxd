@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getUserDiary, getFeedLogs, getRecentAlbums } from "@/lib/queries";
 import { getRecommendations } from "@/lib/recommendations";
 import { getOnThisDay } from "@/lib/on-this-day";
+import { applyCustomCovers } from "@/lib/entitlements";
 import { AlbumCard } from "@/components/album-card";
 import { RecommendationCard } from "@/components/recommendation-card";
 import { OnThisDay } from "@/components/on-this-day";
@@ -89,6 +90,11 @@ export default async function HomePage() {
     getFeedLogs(followedIds, session.user.id),
     getRecommendations(session.user.id),
     getOnThisDay(session.user.id),
+  ]);
+  await Promise.all([
+    applyCustomCovers(session.user.id, recentlyLogged, (log) => log.album),
+    applyCustomCovers(session.user.id, onThisDay, (log) => log.album),
+    applyCustomCovers(session.user.id, recommendations, (rec) => rec),
   ]);
   const communityPreview = communityPicks.slice(0, 2);
 

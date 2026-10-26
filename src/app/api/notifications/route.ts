@@ -22,6 +22,9 @@ export async function GET() {
             album: { select: { title: true } },
           },
         },
+        album: {
+          select: { id: true, title: true, releaseDate: true, artist: { select: { name: true } } },
+        },
       },
     }),
     prisma.notification.count({
