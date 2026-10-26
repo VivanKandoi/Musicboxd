@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasEntitlement } from "@/lib/entitlements";
-import { deleteCover, MAX_COVER_BYTES, saveCover, sniffImage } from "@/lib/cover-uploads";
+import { deleteImage, MAX_IMAGE_BYTES, saveImage, sniffImage } from "@/lib/image-uploads";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -23,24 +23,24 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
-  if (file.size > MAX_COVER_BYTES) {
+  if (file.size > MAX_IMAGE_BYTES) {
     return NextResponse.json({ error: "Image must be 3MB or smaller" }, { status: 400 });
   }
   const bytes = Buffer.from(await file.arrayBuffer());
   const ext = sniffImage(bytes);
   if (!ext) {
-    return NextResponse.json({ error: "Use a PNG, JPEG or WebP image" }, { status: 400 });
+    return NextResponse.json({ error: "Use a PNG, JPEG, WebP or GIF image" }, { status: 400 });
   }
 
   const key = { userId_albumId: { userId: session.user.id, albumId } };
   const previous = await prisma.customCover.findUnique({ where: key });
-  const imageUrl = await saveCover(bytes, ext);
+  const imageUrl = await saveImage("covers", bytes, ext);
   await prisma.customCover.upsert({
     where: key,
     update: { imageUrl },
     create: { userId: session.user.id, albumId, imageUrl },
   });
-  if (previous) await deleteCover(previous.imageUrl);
+  if (previous) await deleteImage("covers", previous.imageUrl);
 
   return NextResponse.json({ imageUrl });
 }
@@ -56,7 +56,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const existing = await prisma.customCover.findUnique({ where: key });
   if (existing) {
     await prisma.customCover.delete({ where: key });
-    await deleteCover(existing.imageUrl);
+    await deleteImage("covers", existing.imageUrl);
   }
   return NextResponse.json({ ok: true });
 }

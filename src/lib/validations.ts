@@ -34,7 +34,8 @@ export const commentSchema = z.object({
 export const profileSchema = z.object({
   name: z.string().max(60).optional(),
   bio: z.string().max(500).optional(),
-  avatarUrl: z.string().url().optional().or(z.literal("")),
+  // Avatars are set only by uploading; this field can only clear one.
+  avatarUrl: z.literal("").optional(),
 });
 
 export const fiveFavesSchema = z.object({
