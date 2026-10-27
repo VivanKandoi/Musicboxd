@@ -33,7 +33,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     : null;
 
   const mode = prefs?.themeMode === "light" ? "light" : "dark";
-  const color = getThemeColor(prefs?.themeColor ?? "coral");
+  const color = getThemeColor(prefs?.themeColor ?? "amber");
 
   return (
     <html
@@ -50,7 +50,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <Providers>
           <Navbar />
-          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
+          <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-6 sm:px-6 lg:pb-6">
             {children}
           </main>
         </Providers>

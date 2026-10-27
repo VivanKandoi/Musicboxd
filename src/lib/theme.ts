@@ -1,8 +1,8 @@
 export const THEME_COLORS = [
+  { id: "amber", label: "Amber", accent: "#f59e0b", accentForeground: "#241704" },
   { id: "coral", label: "Coral", accent: "#ef6351", accentForeground: "#1a0d0a" },
   { id: "teal", label: "Teal", accent: "#2dd4bf", accentForeground: "#062622" },
   { id: "purple", label: "Purple", accent: "#a78bfa", accentForeground: "#1e1332" },
-  { id: "gold", label: "Gold", accent: "#f2b544", accentForeground: "#241a04" },
   { id: "blue", label: "Blue", accent: "#60a5fa", accentForeground: "#0b1f3d" },
   { id: "green", label: "Green", accent: "#4ade80", accentForeground: "#052e12" },
 ] as const;

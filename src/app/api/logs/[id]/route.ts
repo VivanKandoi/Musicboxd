@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logSchema } from "@/lib/validations";
+import { syncLogTags } from "@/lib/tags";
+import { invalidateYearStats } from "@/lib/year-in-review";
 
 export async function GET(
   _request: Request,
@@ -40,7 +42,7 @@ export async function PATCH(
     );
   }
 
-  const { rating, reviewText, listenedAt, isRelisten } = parsed.data;
+  const { rating, reviewText, listenedAt, isRelisten, tags } = parsed.data;
   const log = await prisma.log.update({
     where: { id },
     data: {
@@ -50,6 +52,14 @@ export async function PATCH(
       ...(isRelisten !== undefined ? { isRelisten } : {}),
     },
   });
+
+  if (tags !== undefined) {
+    await syncLogTags(id, tags);
+  }
+  await invalidateYearStats(session.user.id, [
+    existing.listenedAt.getUTCFullYear(),
+    log.listenedAt.getUTCFullYear(),
+  ]);
 
   return NextResponse.json(log);
 }
@@ -70,5 +80,6 @@ export async function DELETE(
   }
 
   await prisma.log.delete({ where: { id } });
+  await invalidateYearStats(session.user.id, [existing.listenedAt.getUTCFullYear()]);
   return NextResponse.json({ ok: true });
 }

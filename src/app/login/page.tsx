@@ -26,7 +26,10 @@ export default function LoginPage() {
       setError("Incorrect email/username or password");
       return;
     }
-    router.push("/");
+    const callbackUrl = new URLSearchParams(window.location.search).get("callbackUrl");
+    const isLocalPath =
+      callbackUrl != null && /^\/(?![/\\])/.test(callbackUrl) && !callbackUrl.includes("\\");
+    router.push(isLocalPath ? callbackUrl : "/");
     router.refresh();
   }
 

@@ -49,3 +49,15 @@ prisma/dev.db-journal
 # user-uploaded content
 /public/uploads/*
 !/public/uploads/.gitkeep
+
+# local Claude Code tooling config (not part of the app)
+/.claude/
+
+# per-user uploads served through API routes
+/uploads/
+
+# research data: large, includes copyrighted audio/lyrics and YouTube cookie files
+/Model Data and Code/
+
+# downloaded ML models (transformers.js)
+/.cache/

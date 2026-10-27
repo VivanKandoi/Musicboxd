@@ -1,9 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { Pencil, Trash2 } from "lucide-react";
 import { StarRating } from "@/components/star-rating";
+import { EditLogForm } from "@/components/edit-log-form";
+import { TagChips } from "@/components/tag-input";
+import { ShareToDmButton } from "@/components/share-to-dm-button";
 
 type Comment = {
   id: string;
@@ -23,6 +28,9 @@ export type ActivityLog = {
   album: { id: string; title: string; coverUrl: string | null; artist: { name: string } };
   _count: { likes: number; comments: number };
   likedByMe: boolean;
+  contextTags: { tag: { name: string } }[];
+  source?: string;
+  playCount?: number | null;
 };
 
 function timeAgo(date: string | Date) {
@@ -45,10 +53,14 @@ function timeAgo(date: string | Date) {
 export function ActivityItem({
   log,
   isAuthenticated,
+  viewerId,
 }: {
   log: ActivityLog;
   isAuthenticated: boolean;
+  viewerId?: string | null;
 }) {
+  const router = useRouter();
+  const isOwner = Boolean(viewerId && viewerId === log.user.id);
   const [liked, setLiked] = useState(log.likedByMe);
   const [likeCount, setLikeCount] = useState(log._count.likes);
   const [commentCount, setCommentCount] = useState(log._count.comments);
@@ -56,6 +68,20 @@ export function ActivityItem({
   const [comments, setComments] = useState<Comment[] | null>(null);
   const [commentText, setCommentText] = useState("");
   const [pending, setPending] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+
+  async function handleDelete() {
+    if (!confirm("Delete this log? This can't be undone.")) return;
+    setDeleting(true);
+    const res = await fetch(`/api/logs/${log.id}`, { method: "DELETE" });
+    setDeleting(false);
+    if (res.ok) {
+      setDeleted(true);
+      router.refresh();
+    }
+  }
 
   async function toggleLike() {
     if (!isAuthenticated) return;
@@ -100,6 +126,38 @@ export function ActivityItem({
     }
   }
 
+  if (deleted) return null;
+
+  if (editing) {
+    return (
+      <div className="flex gap-3 border-b border-border py-4 last:border-0">
+        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-surface-2 ring-1 ring-border sm:h-20 sm:w-20">
+          {log.album.coverUrl && (
+            <Image
+              src={log.album.coverUrl}
+              alt={log.album.title}
+              fill
+              sizes="80px"
+              className="object-cover"
+            />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <EditLogForm
+            logId={log.id}
+            initialRating={log.rating}
+            initialReviewText={log.reviewText}
+            initialListenedAt={log.listenedAt}
+            initialIsRelisten={log.isRelisten}
+            initialTags={log.contextTags.map((t) => t.tag.name)}
+            onCancel={() => setEditing(false)}
+            onSaved={() => setEditing(false)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex gap-3 border-b border-border py-4 last:border-0">
       <Link href={`/album/${log.album.id}`} className="shrink-0">
@@ -117,22 +175,45 @@ export function ActivityItem({
       </Link>
 
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-muted">
-          <Link
-            href={`/u/${log.user.username}`}
-            className="font-medium text-foreground hover:text-accent"
-          >
-            {log.user.name || log.user.username}
-          </Link>{" "}
-          {log.isRelisten ? "relistened to" : "logged"}{" "}
-          <Link
-            href={`/album/${log.album.id}`}
-            className="text-foreground hover:text-accent"
-          >
-            {log.album.title}
-          </Link>{" "}
-          <span className="text-muted">· {log.album.artist.name}</span>
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm text-muted">
+            <Link
+              href={`/u/${log.user.username}`}
+              className="font-medium text-foreground hover:text-accent"
+            >
+              {log.user.name || log.user.username}
+            </Link>{" "}
+            {log.source === "lastfm" ? "listened to" : log.isRelisten ? "relistened to" : "logged"}{" "}
+            <Link
+              href={`/album/${log.album.id}`}
+              className="text-foreground hover:text-accent"
+            >
+              {log.album.title}
+            </Link>{" "}
+            <span className="text-muted">· {log.album.artist.name}</span>
+          </p>
+          {isOwner && (
+            <div className="flex shrink-0 items-center gap-2 text-muted">
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                aria-label="Edit log"
+                className="hover:text-foreground"
+              >
+                <Pencil size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                aria-label="Delete log"
+                className="hover:text-accent disabled:opacity-50"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          )}
+        </div>
 
         {log.rating != null && (
           <div className="mt-1">
@@ -146,8 +227,15 @@ export function ActivityItem({
           </p>
         )}
 
+        <TagChips tags={log.contextTags.map((t) => t.tag.name)} />
+
         <div className="mt-2 flex items-center gap-4 text-xs text-muted">
           <span>{timeAgo(log.listenedAt)}</span>
+          {log.source === "lastfm" && (
+            <span>
+              via Last.fm{log.playCount ? ` · ${log.playCount} ${log.playCount === 1 ? "play" : "plays"}` : ""}
+            </span>
+          )}
           <button
             type="button"
             onClick={toggleLike}
@@ -167,6 +255,7 @@ export function ActivityItem({
             <span>💬</span>
             <span>{commentCount}</span>
           </button>
+          {isAuthenticated && <ShareToDmButton sharedLogId={log.id} />}
         </div>
 
         {showComments && (

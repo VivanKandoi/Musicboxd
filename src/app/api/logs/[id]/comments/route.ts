@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { commentSchema } from "@/lib/validations";
+import { createNotification } from "@/lib/notifications";
 
 export async function POST(
   request: Request,
@@ -30,6 +31,13 @@ export async function POST(
   const comment = await prisma.comment.create({
     data: { logId, userId: session.user.id, text: parsed.data.text },
     include: { user: { select: { username: true, name: true, avatarUrl: true } } },
+  });
+
+  await createNotification({
+    userId: log.userId,
+    actorId: session.user.id,
+    type: "comment",
+    logId,
   });
 
   return NextResponse.json(comment, { status: 201 });

@@ -3,11 +3,19 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { Lock } from "lucide-react";
 import { getUserDiary, getUserStats } from "@/lib/queries";
+import { computeBadges } from "@/lib/badges";
+import { getCompatibility } from "@/lib/compatibility";
+import { applyCustomCovers } from "@/lib/entitlements";
 import { FollowButton } from "@/components/follow-button";
 import { EditProfileForm } from "@/components/edit-profile-form";
 import { FiveFavesEditor } from "@/components/five-faves-editor";
 import { ActivityItem } from "@/components/activity-item";
+import { BadgesSection } from "@/components/badges-section";
+import { ThemedSpotlightCard } from "@/components/fx";
+import CountUp from "@/components/reactbits/CountUp";
+import TiltedCard from "@/components/reactbits/TiltedCard";
 
 export default async function ProfilePage({ params }: PageProps<"/u/[username]">) {
   const { username } = await params;
@@ -48,62 +56,66 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
       )
     : false;
 
-  const [stats, diary] = await Promise.all([
-    getUserStats(user.id),
-    getUserDiary(user.id, session?.user?.id ?? null, 10),
+  const canViewPrivateContent = isOwnProfile || isFollowing || !user.isPrivate;
+
+  const compatibility =
+    session?.user && !isOwnProfile ? await getCompatibility(session.user.id, user.id) : null;
+
+  const [stats, diary, badges] = canViewPrivateContent
+    ? await Promise.all([
+        getUserStats(user.id),
+        getUserDiary(user.id, session?.user?.id ?? null, 10),
+        computeBadges(user.id),
+      ])
+    : [null, null, null];
+  await Promise.all([
+    applyCustomCovers(session?.user?.id, user.fiveFaves, (f) => f.album),
+    applyCustomCovers(session?.user?.id, diary ?? [], (log) => log.album),
   ]);
+  const importedAlbumCount = isOwnProfile
+    ? (
+        await prisma.log.findMany({
+          where: { userId: user.id, source: "lastfm" },
+          distinct: ["albumId"],
+          select: { albumId: true },
+        })
+      ).length
+    : 0;
+
+  if (!canViewPrivateContent) {
+    return (
+      <div className="flex flex-col gap-8">
+        <ProfileHeader
+          user={user}
+          isOwnProfile={isOwnProfile}
+          isFollowing={isFollowing}
+          hasSession={Boolean(session?.user)}
+          compatibility={compatibility}
+        />
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-border bg-surface p-10 text-center">
+          <Lock size={20} className="text-muted" />
+          <p className="text-sm font-medium text-foreground">This profile is private</p>
+          <p className="text-xs text-muted">
+            Follow @{user.username} to see their diary, stats, and favorites.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!stats || !diary || !badges) return null;
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex gap-4">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xl font-medium uppercase text-accent ring-1 ring-border">
-            {user.avatarUrl ? (
-              <Image
-                src={user.avatarUrl}
-                alt={user.username}
-                width={64}
-                height={64}
-                priority
-                className="h-full w-full rounded-full object-cover"
-              />
-            ) : (
-              user.username.slice(0, 2)
-            )}
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold">{user.name || user.username}</h1>
-            <p className="text-sm text-muted">@{user.username}</p>
-            {user.bio && <p className="mt-2 max-w-md text-sm text-foreground/90">{user.bio}</p>}
-            <div className="mt-2 flex gap-4 text-sm text-muted">
-              <Link href={`/u/${user.username}/followers`} className="hover:text-foreground">
-                <span className="font-medium text-foreground">
-                  {user._count.followers}
-                </span>{" "}
-                followers
-              </Link>
-              <Link href={`/u/${user.username}/following`} className="hover:text-foreground">
-                <span className="font-medium text-foreground">
-                  {user._count.following}
-                </span>{" "}
-                following
-              </Link>
-            </div>
-          </div>
-        </div>
+      <ProfileHeader
+        user={user}
+        isOwnProfile={isOwnProfile}
+        isFollowing={isFollowing}
+        hasSession={Boolean(session?.user)}
+        compatibility={compatibility}
+      />
 
-        <div>
-          {isOwnProfile ? (
-            <EditProfileForm
-              initialName={user.name ?? ""}
-              initialBio={user.bio ?? ""}
-              initialAvatarUrl={user.avatarUrl}
-            />
-          ) : session?.user ? (
-            <FollowButton username={user.username} initiallyFollowing={isFollowing} />
-          ) : null}
-        </div>
-      </section>
+      <BadgesSection badges={badges} />
 
       <section>
         <div className="mb-3 flex items-center justify-between">
@@ -120,16 +132,31 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
           <div className="grid grid-cols-5 gap-3">
             {user.fiveFaves.map((f) => (
               <Link key={f.id} href={`/album/${f.album.id}`} className="group">
-                <div className="relative aspect-square overflow-hidden rounded-lg bg-surface-2 ring-1 ring-border group-hover:ring-accent">
-                  {f.album.coverUrl && (
-                    <Image
-                      src={f.album.coverUrl}
-                      alt={f.album.title}
-                      fill
-                      sizes="120px"
-                      className="object-cover"
-                    />
-                  )}
+                <div className="relative aspect-square">
+                  <TiltedCard
+                    containerHeight="100%"
+                    containerWidth="100%"
+                    imageHeight="100%"
+                    imageWidth="100%"
+                    radius={8}
+                    rotateAmplitude={14}
+                    scaleOnHover={1.06}
+                    showTooltip={false}
+                    flipOnClick={false}
+                    gyroscope={false}
+                    intro={false}
+                  >
+                    <div className="absolute inset-0 rounded-lg bg-surface-2 ring-1 ring-inset ring-border group-hover:ring-accent" />
+                    {f.album.coverUrl && (
+                      <Image
+                        src={f.album.coverUrl}
+                        alt={f.album.title}
+                        fill
+                        sizes="120px"
+                        className="object-cover"
+                      />
+                    )}
+                  </TiltedCard>
                 </div>
                 <p className="mt-1 truncate text-xs text-foreground">{f.album.title}</p>
               </Link>
@@ -145,7 +172,8 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
           <StatTile label="Unique albums" value={stats.albumsLogged} />
           <StatTile
             label="Avg rating given"
-            value={stats.avgRating ? stats.avgRating.toFixed(1) : "—"}
+            value={stats.avgRating ?? "—"}
+            decimals={1}
           />
           <StatTile label="Genres explored" value={stats.topGenres.length} />
         </div>
@@ -160,6 +188,12 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
               </span>
             ))}
           </div>
+        )}
+        {importedAlbumCount > 0 && (
+          <Link href="/settings/import#imported" className="mt-3 inline-block text-xs text-accent hover:underline">
+            Includes {importedAlbumCount} {importedAlbumCount === 1 ? "album" : "albums"} imported from Last.fm ·
+            view list (only you can see this)
+          </Link>
         )}
       </section>
 
@@ -178,7 +212,12 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
         ) : (
           <div>
             {diary.map((log) => (
-              <ActivityItem key={log.id} log={log} isAuthenticated={Boolean(session?.user)} />
+              <ActivityItem
+                key={log.id}
+                log={log}
+                isAuthenticated={Boolean(session?.user)}
+                viewerId={session?.user?.id}
+              />
             ))}
           </div>
         )}
@@ -187,11 +226,108 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
   );
 }
 
-function StatTile({ label, value }: { label: string; value: string | number }) {
+function StatTile({ label, value, decimals = 0 }: { label: string; value: string | number; decimals?: number }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
-      <p className="text-2xl font-semibold text-foreground">{value}</p>
+    <ThemedSpotlightCard className="rounded-xl border border-border p-4">
+      <p className="text-2xl font-semibold text-foreground">
+        {typeof value === "number" ? <CountUp to={value} decimals={decimals} duration={1.2} separator="," /> : value}
+      </p>
       <p className="text-xs text-muted">{label}</p>
-    </div>
+    </ThemedSpotlightCard>
+  );
+}
+
+function ProfileHeader({
+  user,
+  isOwnProfile,
+  isFollowing,
+  hasSession,
+  compatibility,
+}: {
+  user: {
+    username: string;
+    name: string | null;
+    bio: string | null;
+    avatarUrl: string | null;
+    isPrivate: boolean;
+    _count: { followers: number; following: number };
+  };
+  isOwnProfile: boolean;
+  isFollowing: boolean;
+  hasSession: boolean;
+  compatibility?: { score: number; basis: "ratings" | "genres"; sharedCount: number } | null;
+}) {
+  return (
+    <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex gap-4">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xl font-medium uppercase text-accent ring-1 ring-border">
+          {user.avatarUrl ? (
+            <Image
+              src={user.avatarUrl}
+              alt={user.username}
+              width={64}
+              height={64}
+              priority
+              className="h-full w-full rounded-full object-cover"
+            />
+          ) : (
+            user.username.slice(0, 2)
+          )}
+        </div>
+        <div>
+          <h1 className="flex items-center gap-1.5 text-xl font-semibold">
+            {user.name || user.username}
+            {user.isPrivate && <Lock size={13} className="text-muted" />}
+          </h1>
+          <p className="text-sm text-muted">@{user.username}</p>
+          {compatibility && (
+            <p className="mt-1 text-xs text-accent">
+              {compatibility.score}% taste match
+              <span className="text-muted">
+                {" "}
+                ({compatibility.basis === "ratings" ? "shared ratings" : "shared genres"})
+              </span>
+            </p>
+          )}
+          {user.bio && <p className="mt-2 max-w-md text-sm text-foreground/90">{user.bio}</p>}
+          <div className="mt-2 flex gap-4 text-sm text-muted">
+            <Link href={`/u/${user.username}/followers`} className="hover:text-foreground">
+              <span className="font-medium text-foreground">{user._count.followers}</span>{" "}
+              followers
+            </Link>
+            <Link href={`/u/${user.username}/following`} className="hover:text-foreground">
+              <span className="font-medium text-foreground">{user._count.following}</span>{" "}
+              following
+            </Link>
+            <Link href={`/u/${user.username}/lists`} className="hover:text-foreground">
+              Lists
+            </Link>
+            <Link href={`/u/${user.username}/year`} className="hover:text-foreground">
+              Year in review
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {isOwnProfile ? (
+          <EditProfileForm
+            initialName={user.name ?? ""}
+            initialBio={user.bio ?? ""}
+            initialAvatarUrl={user.avatarUrl}
+          />
+        ) : hasSession ? (
+          <div className="flex items-center gap-2">
+            <FollowButton username={user.username} initiallyFollowing={isFollowing} />
+            <Link
+              href={`/messages/${user.username}`}
+              className="rounded-full border border-border px-4 py-1.5 text-sm text-muted hover:border-accent hover:text-foreground"
+            >
+              Message
+            </Link>
+          </div>
+        ) : null}
+      </div>
+    </section>
   );
 }

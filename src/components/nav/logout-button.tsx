@@ -10,7 +10,7 @@ export function LogoutButton() {
     >
       <button
         type="submit"
-        className="text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
+        className="w-full cursor-pointer rounded-lg px-2.5 py-2 text-left text-sm text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
       >
         Log out
       </button>

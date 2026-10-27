@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "i.scdn.co" },
       { protocol: "https", hostname: "*.discogs.com" },
+      { protocol: "https", hostname: "coverartarchive.org" },
+      { protocol: "https", hostname: "*.coverartarchive.org" },
+      // Apple's artwork CDN (iTunes Search API fallback for albums without Cover Art Archive art)
+      { protocol: "https", hostname: "*.mzstatic.com", pathname: "/image/thumb/**" },
     ],
     // Uploaded avatars are validated (type + size) at the upload boundary and
     // are meant to render inline (profile pictures), not download as files.

@@ -15,17 +15,80 @@ model User {
   name         String?
   bio          String?
   avatarUrl    String?
-  themeColor   String   @default("coral")
+  themeColor   String   @default("amber")
   themeMode    String   @default("dark")
   createdAt    DateTime @default(now())
 
-  logs      Log[]
-  comments  Comment[]
-  likes     Like[]
-  fiveFaves FiveFave[]
+  isPrivate          Boolean @default(false)
+  dmPrivacy          String  @default("everyone") // everyone | followers | none
+  notifyOnFollow     Boolean @default(true)
+  notifyOnLike       Boolean @default(true)
+  notifyOnComment    Boolean @default(true)
+  notifyOnMessage    Boolean @default(true)
+  notifyOnRelease    Boolean @default(true)
+  notifyOnAnniversary Boolean @default(true)
+  emailNotifications Boolean @default(true)
+
+  logs         Log[]
+  comments     Comment[]
+  likes        Like[]
+  fiveFaves    FiveFave[]
+  trackRatings TrackRating[]
+  rankedLists  RankedList[]
 
   following Follow[] @relation("follower")
   followers Follow[] @relation("following")
+
+  sentMessages     Message[]                 @relation("sentMessages")
+  conversations    ConversationParticipant[]
+
+  notifications      Notification[] @relation("notifUser")
+  notificationsCaused Notification[] @relation("notifActor")
+
+  listMemberships ListMember[]
+  listInvites     ListInvite[]
+  listItemsAdded  RankedListItem[] @relation("listItemAddedBy")
+  yearStats       YearStats[]
+  importJobs      ImportJob[]
+  importReviews   ImportReviewItem[]
+  entitlements    Entitlement[]
+  customCovers    CustomCover[]
+  artistFollows   ArtistFollow[]
+}
+
+model ArtistFollow {
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  artist    Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  artistId  String
+  createdAt DateTime @default(now())
+
+  @@id([userId, artistId])
+  @@index([artistId])
+}
+
+// Premium features a user has. Checked only through src/lib/entitlements.ts.
+// source = "mock" for the demo toggle; a real billing integration would add its own.
+model Entitlement {
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  feature   String // e.g. custom_covers
+  source    String   @default("mock")
+  grantedAt DateTime @default(now())
+
+  @@id([userId, feature])
+}
+
+// A per-user cover override, shown only in that user's own views.
+model CustomCover {
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  album     Album    @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  albumId   String
+  imageUrl  String
+  createdAt DateTime @default(now())
+
+  @@id([userId, albumId])
 }
 
 model Follow {
@@ -41,12 +104,16 @@ model Follow {
 }
 
 model Artist {
-  id        String  @id @default(cuid())
-  name      String
-  imageUrl  String?
-  spotifyId String? @unique
-  discogsId String? @unique
-  albums    Album[]
+  id             String  @id @default(cuid())
+  name           String
+  imageUrl       String?
+  spotifyId      String? @unique
+  discogsId      String? @unique
+  musicbrainzId  String? @unique
+  albums         Album[]
+  followers      ArtistFollow[]
+  // last time the release-calendar job checked MusicBrainz for new release groups
+  releasesCheckedAt DateTime?
 }
 
 model Genre {
@@ -65,35 +132,81 @@ model AlbumGenre {
 }
 
 model Album {
-  id          String    @id @default(cuid())
-  title       String
-  coverUrl    String?
-  releaseDate DateTime?
-  artist      Artist    @relation(fields: [artistId], references: [id])
-  artistId    String
-  spotifyId   String?   @unique
-  discogsId   String?   @unique
-  createdAt   DateTime  @default(now())
+  id                String    @id @default(cuid())
+  title             String
+  coverUrl          String?
+  releaseDate       DateTime?
+  releaseGroupType  String    @default("Album")
+  artist            Artist    @relation(fields: [artistId], references: [id])
+  artistId          String
+  spotifyId         String?   @unique
+  discogsId         String?   @unique
+  musicbrainzId     String?   @unique
+  createdAt         DateTime  @default(now())
 
   tracks    Track[]
   credits   Credit[]
   genres    AlbumGenre[]
   logs      Log[]
   fiveFaves FiveFave[]
+  rankedListItems RankedListItem[]
+  sharedInMessages Message[]
+  customCovers    CustomCover[]
+  notifications   Notification[]
 
   @@index([artistId])
   @@index([title])
 }
 
 model Track {
-  id          String  @id @default(cuid())
-  title       String
-  trackNumber Int
-  durationSec Int?
-  album       Album   @relation(fields: [albumId], references: [id], onDelete: Cascade)
-  albumId     String
+  id            String  @id @default(cuid())
+  title         String
+  trackNumber   Int
+  durationSec   Int?
+  musicbrainzId String?
+  album         Album   @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  albumId       String
+
+  // Semantic Discovery (songs from the MERGE research catalogue)
+  allmusicId String?  @unique
+  quadrant   String? // Russell quadrant: Q1 happy/energetic, Q2 tense, Q3 sad/calm, Q4 calm/content
+  valence    Float?
+  arousal    Float?
+  // { moods: string[], themes: string[], styles: string[], genres: string[] } from AllMusic
+  songTags   Json?
+
+  ratings    TrackRating[]
+  embeddings TrackEmbedding[]
 
   @@index([albumId])
+  @@index([musicbrainzId])
+}
+
+// One vector per track per embedding space, stored as raw float32 (little-endian).
+// space: "lyrics" (all-MiniLM-L6-v2, 384-d) | "reviews" (MiniLM, mean of 5 comments) | "audio" (LAION-CLAP, 512-d)
+model TrackEmbedding {
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  trackId String
+  space   String
+  dim     Int
+  vector  Bytes
+
+  @@id([trackId, space])
+  @@index([space])
+}
+
+model TrackRating {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  trackId   String
+  rating    Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, trackId])
+  @@index([trackId])
 }
 
 model Credit {
@@ -118,13 +231,22 @@ model Log {
   listenedAt DateTime @default(now())
   isRelisten Boolean  @default(false)
   createdAt  DateTime @default(now())
+  source     String   @default("manual") // manual | lastfm
+  playCount  Int?
+  importKey  String?  @unique
+  // Imported all-time plays with no real date: excluded from date-based views.
+  undated    Boolean  @default(false)
 
   likes    Like[]
   comments Comment[]
+  contextTags LogContextTag[]
+  sharedInMessages Message[]
+  notifications Notification[]
 
   @@index([userId])
   @@index([albumId])
   @@index([userId, createdAt])
+  @@index([userId, listenedAt])
 }
 
 model Like {
@@ -161,4 +283,196 @@ model FiveFave {
 
   @@unique([userId, position])
   @@unique([userId, albumId])
+}
+
+// Messages live in conversations rather than sender/recipient pairs, so group chat is
+// mostly UI work: a group is a conversation with isGroup = true and more participants.
+model Conversation {
+  id        String   @id @default(cuid())
+  isGroup   Boolean  @default(false)
+  title     String?
+  // "<userIdA>:<userIdB>" (sorted) for 1:1 chats, so each pair has exactly one conversation
+  directKey String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) // time of the latest message
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([updatedAt])
+}
+
+model ConversationParticipant {
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  joinedAt       DateTime     @default(now())
+  lastReadAt     DateTime?
+
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  sender         User         @relation("sentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId       String
+  text           String?
+  sharedAlbum    Album?       @relation(fields: [sharedAlbumId], references: [id], onDelete: SetNull)
+  sharedAlbumId  String?
+  sharedLog      Log?         @relation(fields: [sharedLogId], references: [id], onDelete: SetNull)
+  sharedLogId    String?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  user      User     @relation("notifUser", fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  actor     User?    @relation("notifActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId   String?
+  type      String // follow | like | comment | message | release | anniversary | reissue
+  log       Log?     @relation(fields: [logId], references: [id], onDelete: Cascade)
+  logId     String?
+  album     Album?   @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  albumId   String?
+  // set by scheduled jobs so re-running them never notifies twice
+  dedupeKey String?  @unique
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, read])
+}
+
+model RankedList {
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  title       String
+  description String?
+  isPublic    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items   RankedListItem[]
+  members ListMember[]
+  invites ListInvite[]
+
+  @@index([userId])
+}
+
+model RankedListItem {
+  id        String     @id @default(cuid())
+  list      RankedList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listId    String
+  album     Album      @relation(fields: [albumId], references: [id])
+  albumId   String
+  rank      String // fractional index: reordering rewrites only the moved row
+  note      String?
+  addedBy   User?      @relation("listItemAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+  addedById String?
+  createdAt DateTime   @default(now())
+
+  @@unique([listId, albumId])
+  @@index([listId, rank])
+}
+
+model ListMember {
+  list      RankedList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  role      String // owner | editor
+  createdAt DateTime   @default(now())
+
+  @@id([listId, userId])
+  @@index([userId])
+}
+
+model ListInvite {
+  id          String     @id @default(cuid())
+  token       String     @unique
+  list        RankedList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listId      String
+  createdBy   User       @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdById String
+  createdAt   DateTime   @default(now())
+  revokedAt   DateTime?
+
+  @@index([listId])
+}
+
+model YearStats {
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  year       Int
+  data       Json
+  computedAt DateTime @default(now())
+
+  @@id([userId, year])
+}
+
+model ImportJob {
+  id             String    @id @default(cuid())
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  source         String    @default("lastfm")
+  externalUser   String
+  status         String    @default("pending") // pending | running | done | failed
+  stage          String?
+  total          Int       @default(0)
+  processed      Int       @default(0)
+  matched        Int       @default(0)
+  queued         Int       @default(0)
+  unmatched      Int       @default(0)
+  listensCreated Int       @default(0)
+  error          String?
+  createdAt      DateTime  @default(now())
+  finishedAt     DateTime?
+
+  reviewItems ImportReviewItem[]
+
+  @@index([userId, createdAt])
+}
+
+model ImportReviewItem {
+  id              String    @id @default(cuid())
+  job             ImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobId           String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  artistName      String
+  albumTitle      String
+  playCount       Int       @default(0)
+  listens         Json // [{ day: "YYYY-MM-DD", plays: n }] for dated scrobbles
+  candidates      Json // [{ albumId, title, artist, score }]
+  status          String    @default("pending") // pending | accepted | rejected
+  resolvedAlbumId String?
+  createdAt       DateTime  @default(now())
+
+  @@index([userId, status])
+}
+
+model ContextTag {
+  id   String @id @default(cuid())
+  name String @unique
+
+  logs LogContextTag[]
+}
+
+model LogContextTag {
+  log   Log        @relation(fields: [logId], references: [id], onDelete: Cascade)
+  logId String
+  tag   ContextTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId String
+
+  @@id([logId, tagId])
+  @@index([tagId])
 }

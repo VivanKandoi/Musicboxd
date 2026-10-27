@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { profileSchema } from "@/lib/validations";
+import { deleteImage } from "@/lib/image-uploads";
 
 export async function PATCH(request: Request) {
   const session = await auth();
@@ -19,14 +20,21 @@ export async function PATCH(request: Request) {
   }
 
   const { name, bio, avatarUrl } = parsed.data;
+  const removingAvatar = avatarUrl !== undefined;
+  const previous = removingAvatar
+    ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { avatarUrl: true } })
+    : null;
+
   const user = await prisma.user.update({
     where: { id: session.user.id },
     data: {
       ...(name !== undefined ? { name } : {}),
       ...(bio !== undefined ? { bio } : {}),
-      ...(avatarUrl !== undefined ? { avatarUrl: avatarUrl || null } : {}),
+      ...(removingAvatar ? { avatarUrl: null } : {}),
     },
+    select: { username: true, name: true, bio: true, avatarUrl: true },
   });
+  if (removingAvatar) await deleteImage("avatars", previous?.avatarUrl);
 
   return NextResponse.json(user);
 }
