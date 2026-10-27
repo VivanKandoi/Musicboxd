@@ -17,9 +17,16 @@
     "jobs:releases": "tsx scripts/release-calendar-job.ts",
     "jobs:import-worker": "tsx scripts/import-worker.ts",
     "eval:year-stats": "tsx scripts/verify-year-stats.ts",
-    "eval:recs": "tsx scripts/eval-recommendations.ts"
+    "eval:recs": "tsx scripts/eval-recommendations.ts",
+    "semantic:export": "python3 scripts/semantic/export_bundle.py",
+    "semantic:resolve": "tsx scripts/semantic/resolve-musicbrainz.ts",
+    "semantic:import": "tsx scripts/semantic/import-catalog.ts",
+    "semantic:enrich": "tsx scripts/semantic/enrich-albums.ts",
+    "semantic:parity": "tsx scripts/semantic/check-parity.ts",
+    "semantic:warm": "tsx -e \"import('./src/lib/text-embedder').then(m => m.embedText('warm up')).then(() => console.log('Query model cached in .cache/transformers'))\""
   },
   "dependencies": {
+    "@huggingface/transformers": "4.3.1",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.4.0",

@@ -167,10 +167,32 @@ model Track {
   album         Album   @relation(fields: [albumId], references: [id], onDelete: Cascade)
   albumId       String
 
-  ratings TrackRating[]
+  // Semantic Discovery (songs from the MERGE research catalogue)
+  allmusicId String?  @unique
+  quadrant   String? // Russell quadrant: Q1 happy/energetic, Q2 tense, Q3 sad/calm, Q4 calm/content
+  valence    Float?
+  arousal    Float?
+  // { moods: string[], themes: string[], styles: string[], genres: string[] } from AllMusic
+  songTags   Json?
+
+  ratings    TrackRating[]
+  embeddings TrackEmbedding[]
 
   @@index([albumId])
   @@index([musicbrainzId])
+}
+
+// One vector per track per embedding space, stored as raw float32 (little-endian).
+// space: "lyrics" (all-MiniLM-L6-v2, 384-d) | "reviews" (MiniLM, mean of 5 comments) | "audio" (LAION-CLAP, 512-d)
+model TrackEmbedding {
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  trackId String
+  space   String
+  dim     Int
+  vector  Bytes
+
+  @@id([trackId, space])
+  @@index([space])
 }
 
 model TrackRating {

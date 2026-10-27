@@ -1,144 +1,157 @@
-"use client";
-
-import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Sparkles, ArrowRight, Play, Heart, Bookmark } from "lucide-react";
-import { DEMO_DISCOVER_RESULTS, DEMO_SUGGESTIONS } from "@/lib/demo-discover-data";
+import Image from "next/image";
+import Form from "next/form";
+import { Sparkles, ArrowRight } from "lucide-react";
+import { auth } from "@/lib/auth";
+import { applyCustomCovers } from "@/lib/entitlements";
+import { BENCHMARK_QUERIES } from "@/lib/semantic-queries";
+import { QUADRANTS, SYSTEMS, semanticCatalogSize, semanticSearch, type Quadrant, type SystemId } from "@/lib/semantic-search";
+import { loadSemanticTracks } from "@/lib/semantic-tracks";
 
-export default function DiscoverPage() {
-  const [query, setQuery] = useState("Songs that feel nostalgic but hopeful");
-  const [genre, setGenre] = useState("Any");
-  const [decade, setDecade] = useState("1990s - 2020s");
-  const [mood, setMood] = useState("Warm / Nostalgic");
-  const [energy, setEnergy] = useState("Medium");
+const DECADES = [1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010];
+const pct = (p: number) => `top ${Math.max(1, Math.round((1 - p) * 100))}%`;
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return DEMO_DISCOVER_RESULTS;
-    const scored = DEMO_DISCOVER_RESULTS.filter((r) =>
-      r.tags.some((t) => q.includes(t)) ||
-      r.title.toLowerCase().includes(q) ||
-      q.split(/\s+/).some((w) => r.tags.includes(w))
-    );
-    return scored.length > 0 ? scored : DEMO_DISCOVER_RESULTS;
-  }, [query]);
+function first<T extends string>(value: string | string[] | undefined) {
+  return (Array.isArray(value) ? value[0] : value) as T | undefined;
+}
+
+export default async function DiscoverPage({ searchParams }: PageProps<"/discover">) {
+  const params = await searchParams;
+  const query = (first(params.q) ?? "").trim().slice(0, 300);
+  const system: SystemId = first(params.mode) === "lyrics+reviews" ? "lyrics+reviews" : "lyrics";
+  const moodParam = first<Quadrant>(params.mood);
+  const mood = moodParam && moodParam in QUADRANTS ? moodParam : null;
+  const decadeParam = Number(first(params.decade));
+  const decade = DECADES.includes(decadeParam) ? decadeParam : null;
+
+  const [session, catalogSize] = await Promise.all([auth(), semanticCatalogSize()]);
+  const hits = query
+    ? await semanticSearch(query, { system, limit: 20, quadrants: mood ? [mood] : [], decade })
+    : [];
+  const tracks = await loadSemanticTracks(hits.map((h) => h.trackId));
+  await applyCustomCovers(session?.user?.id, tracks, (t) => t.album);
+  const hitById = new Map(hits.map((h) => [h.trackId, h]));
+
+  const explainQuery = new URLSearchParams({ q: query, mode: system }).toString();
+  const suggestions = BENCHMARK_QUERIES.filter((q, i) => q.surveyed || i % 5 === 2).slice(0, 8);
 
   return (
     <div>
-      <div className="mb-1 flex items-center gap-2 text-xs text-muted">
-        <span className="rounded-full border border-border px-2 py-0.5">Preview</span>
-        <span>Static demo — no ML model wired up yet</span>
-      </div>
       <h1 className="text-2xl font-semibold sm:text-3xl">Semantic Music Discovery</h1>
       <p className="mb-6 text-sm text-muted">
-        Unlock sonic landscapes described in your own words.
+        Describe a feeling, a situation or a story. We match it against what {catalogSize.toLocaleString()} songs are
+        actually about.
       </p>
 
-      <div className="rounded-xl border border-accent/50 bg-surface p-4">
-        <div className="flex items-center gap-2 rounded-lg border border-accent/40 bg-background px-3 py-2.5">
-          <Sparkles size={16} className="shrink-0 text-accent" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Songs that feel nostalgic but hopeful"
-            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted focus:outline-none"
-          />
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          {DEMO_SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setQuery(s)}
-              className="rounded-full border border-border px-3 py-1 text-xs text-muted hover:border-accent hover:text-foreground"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <FilterSelect label="Genre" value={genre} onChange={setGenre} options={["Any", "Pop", "Electronic", "Folk", "Rock"]} />
-          <FilterSelect label="Decade" value={decade} onChange={setDecade} options={["1990s - 2020s", "2000s - 2010s", "2020s"]} />
-          <FilterSelect label="Mood" value={mood} onChange={setMood} options={["Warm / Nostalgic", "Energetic", "Melancholy", "Calm"]} />
-          <FilterSelect label="Energy" value={energy} onChange={setEnergy} options={["Low", "Medium", "High"]} />
-        </div>
-      </div>
-
-      <div className="mt-8 flex items-center justify-between">
-        <h2 className="text-lg font-medium">Ranked Match Results</h2>
-        <p className="text-xs text-muted">
-          {results.length} matches found · Model semantic v2
+      {catalogSize === 0 ? (
+        <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted">
+          The semantic catalogue hasn&rsquo;t been imported yet. Run <code>npm run semantic:import</code>.
         </p>
-      </div>
-
-      <div className="mt-3 flex flex-col gap-2">
-        {results.map((r, i) => (
-          <div
-            key={r.slug}
-            className="flex items-center gap-4 rounded-xl border border-border bg-surface p-3"
-          >
-            <span className="w-4 shrink-0 text-sm text-muted">{i + 1}</span>
-            <div
-              className="h-12 w-12 shrink-0 rounded-lg"
-              style={{ backgroundImage: `linear-gradient(135deg, ${r.gradient})` }}
+      ) : (
+        <Form action="/discover" className="rounded-xl border border-accent/50 bg-surface p-4">
+          <div className="flex items-center gap-2 rounded-lg border border-accent/40 bg-background px-3 py-2.5">
+            <Sparkles size={16} className="shrink-0 text-accent" />
+            <input
+              name="q"
+              defaultValue={query}
+              placeholder="a song about growing older and changing"
+              aria-label="Describe the music you want"
+              className="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted focus:outline-none"
             />
-            <Link href={`/discover/${r.slug}`} className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-foreground hover:text-accent">
-                {r.title}
-              </p>
-              <p className="truncate text-xs text-muted">{r.artist}</p>
-            </Link>
-            <div className="hidden shrink-0 flex-col items-end sm:flex">
-              <span className="text-sm font-semibold text-success">{r.match}%</span>
-              <span className="text-[10px] uppercase tracking-wide text-muted">
-                Semantic Match
-              </span>
-            </div>
-            <div className="hidden gap-1.5 md:flex">
-              {r.tags.map((t) => (
-                <span
-                  key={t}
-                  className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] text-muted"
+            <button
+              type="submit"
+              className="shrink-0 rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-accent-foreground hover:opacity-90"
+            >
+              Search
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <FilterSelect name="mode" label="Match on" value={system} options={Object.entries(SYSTEMS).map(([id, s]) => [id, s.label])} />
+            <FilterSelect name="mood" label="Mood" value={mood ?? ""} options={[["", "Any"], ...Object.entries(QUADRANTS)]} />
+            <FilterSelect name="decade" label="Decade" value={decade?.toString() ?? ""} options={[["", "Any"], ...DECADES.map((d) => [String(d), `${d}s`])]} />
+          </div>
+
+          {!query && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {suggestions.map((s) => (
+                <Link
+                  key={s.query}
+                  href={`/discover?${new URLSearchParams({ q: s.query })}`}
+                  className="rounded-full border border-border px-3 py-1 text-xs text-muted hover:border-accent hover:text-foreground"
                 >
-                  {t}
-                </span>
+                  {s.query}
+                </Link>
               ))}
             </div>
-            <div className="flex shrink-0 items-center gap-1 text-muted">
-              <button
-                type="button"
-                disabled
-                className="flex h-7 w-7 items-center justify-center rounded-full text-accent opacity-60"
-                title="Playback not available in this preview"
-              >
-                <Play size={14} />
-              </button>
-              <button
-                type="button"
-                disabled
-                className="flex h-7 w-7 items-center justify-center rounded-full opacity-60"
-              >
-                <Heart size={14} />
-              </button>
-              <button
-                type="button"
-                disabled
-                className="flex h-7 w-7 items-center justify-center rounded-full opacity-60"
-              >
-                <Bookmark size={14} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          )}
+        </Form>
+      )}
 
-      <Link
-        href="/search"
-        className="mt-6 flex items-center gap-1 text-sm text-accent hover:underline"
-      >
-        Looking for something specific? Search the real catalog
+      {query && (
+        <>
+          <div className="mt-8 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-lg font-medium">Best matches</h2>
+            <p className="text-xs text-muted">
+              Matched on {SYSTEMS[system].label.toLowerCase()} · ranked by z-scored cosine similarity
+            </p>
+          </div>
+          {tracks.length === 0 ? (
+            <p className="mt-3 text-sm text-muted">No songs match those filters. Try a different mood or decade.</p>
+          ) : (
+            <ol className="mt-3 flex flex-col gap-2">
+              {tracks.map((t, i) => {
+                const hit = hitById.get(t.id)!;
+                const chips = [...(t.tags.themes ?? []).slice(0, 2), ...(t.tags.moods ?? []).slice(0, 2)];
+                return (
+                  <li key={t.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3">
+                    <span className="w-5 shrink-0 text-center text-sm text-muted">{i + 1}</span>
+                    <Link href={`/album/${t.album.id}`} className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-surface-2 ring-1 ring-border">
+                      {t.album.coverUrl && <Image src={t.album.coverUrl} alt={t.album.title} fill sizes="48px" className="object-cover" />}
+                    </Link>
+                    <div className="min-w-0 flex-1">
+                      <Link href={`/discover/song/${t.id}?${explainQuery}`} className="block truncate text-sm font-medium text-foreground hover:text-accent">
+                        {t.title}
+                      </Link>
+                      <p className="truncate text-xs text-muted">
+                        <Link href={`/artist/${t.album.artist.id}`} className="hover:text-foreground">
+                          {t.album.artist.name}
+                        </Link>
+                        {" · "}
+                        <Link href={`/album/${t.album.id}`} className="hover:text-foreground">
+                          {t.album.title}
+                        </Link>
+                        {t.tags.year ? ` · ${t.tags.year}` : ""}
+                      </p>
+                      {chips.length > 0 && (
+                        <div className="mt-1 hidden flex-wrap gap-1 sm:flex">
+                          {chips.map((c) => (
+                            <span key={c} className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] text-muted">
+                              {c}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <Link href={`/discover/song/${t.id}?${explainQuery}`} className="shrink-0 text-right" title="Why this match?">
+                      <span className="block text-xs font-semibold text-success">
+                        {hit.lyrics ? `Lyrics ${pct(hit.lyrics.percentile)}` : ""}
+                      </span>
+                      {system === "lyrics+reviews" && hit.reviews && (
+                        <span className="block text-[10px] text-muted">Reviews {pct(hit.reviews.percentile)}</span>
+                      )}
+                      <span className="block text-[10px] text-accent">Why? →</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </>
+      )}
+
+      <Link href="/guides" className="mt-6 flex items-center gap-1 text-sm text-accent hover:underline">
+        Prefer a guided tour? Browse the Start Here guides
         <ArrowRight size={14} />
       </Link>
     </div>
@@ -146,27 +159,23 @@ export default function DiscoverPage() {
 }
 
 function FilterSelect({
+  name,
   label,
   value,
-  onChange,
   options,
 }: {
+  name: string;
   label: string;
   value: string;
-  onChange: (v: string) => void;
-  options: string[];
+  options: (readonly [string, string] | string[])[];
 }) {
   return (
     <label className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs text-muted">
       {label}:
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="bg-transparent text-foreground focus:outline-none"
-      >
-        {options.map((o) => (
-          <option key={o} value={o} className="bg-surface text-foreground">
-            {o}
+      <select name={name} defaultValue={value} className="bg-transparent text-foreground focus:outline-none">
+        {options.map(([v, l]) => (
+          <option key={v} value={v} className="bg-surface text-foreground">
+            {l}
           </option>
         ))}
       </select>

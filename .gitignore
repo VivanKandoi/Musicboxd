@@ -55,3 +55,9 @@ prisma/dev.db-journal
 
 # per-user uploads served through API routes
 /uploads/
+
+# research data: large, includes copyrighted audio/lyrics and YouTube cookie files
+/Model Data and Code/
+
+# downloaded ML models (transformers.js)
+/.cache/
