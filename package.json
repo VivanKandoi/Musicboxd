@@ -22,6 +22,8 @@
     "semantic:resolve": "tsx scripts/semantic/resolve-musicbrainz.ts",
     "semantic:import": "tsx scripts/semantic/import-catalog.ts",
     "semantic:enrich": "tsx scripts/semantic/enrich-albums.ts",
+    "semantic:covers": "tsx scripts/semantic/fill-missing-covers.ts",
+    "semantic:covers-itunes": "tsx scripts/semantic/fill-covers-itunes.ts",
     "semantic:parity": "tsx scripts/semantic/check-parity.ts",
     "semantic:warm": "tsx -e \"import('./src/lib/text-embedder').then(m => m.embedText('warm up')).then(() => console.log('Query model cached in .cache/transformers'))\""
   },

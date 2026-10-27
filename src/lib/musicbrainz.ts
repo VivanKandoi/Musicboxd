@@ -46,6 +46,24 @@ export type MBRelease = {
   disambiguation?: string;
 };
 
+// Front cover (500px thumbnail) from the Cover Art Archive for "release/<mbid>" or
+// "release-group/<mbid>", or null if there isn't one.
+export async function caaCover(path: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://coverartarchive.org/${path}`, {
+      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+      signal: AbortSignal.timeout(10000),
+    });
+    await new Promise((r) => setTimeout(r, 300));
+    if (!res.ok) return null;
+    const data = (await res.json()) as { images?: { front?: boolean; image: string; thumbnails?: Record<string, string> }[] };
+    const front = data.images?.find((i) => i.front) ?? data.images?.[0];
+    return (front?.thumbnails?.["500"] ?? front?.image ?? null)?.replace(/^http:\/\//, "https://") ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // Only full YYYY-MM-DD dates are usable for a calendar.
 export function parseFullDate(date: string | undefined) {
   return date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T00:00:00Z`) : null;

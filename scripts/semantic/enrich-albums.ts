@@ -4,31 +4,13 @@
 //   npm run semantic:enrich
 import { readFileSync } from "node:fs";
 import { prisma } from "../../src/lib/prisma";
-import { mbGet } from "../../src/lib/musicbrainz";
+import { caaCover, mbGet } from "../../src/lib/musicbrainz";
 import { normalizeTitle } from "../../src/lib/import-matching";
 import type { Resolution } from "./resolve-musicbrainz";
-
-const USER_AGENT = "MusicBoxd/1.0 (https://github.com/VivanKandoi)";
 
 type ReleaseDetail = {
   media?: { tracks?: { title: string; number: string; position: number; length?: number; recording?: { id: string } }[] }[];
 };
-
-async function coverFor(path: string) {
-  try {
-    const res = await fetch(`https://coverartarchive.org/${path}`, {
-      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-      signal: AbortSignal.timeout(10000),
-    });
-    await new Promise((r) => setTimeout(r, 300));
-    if (!res.ok) return null;
-    const data = (await res.json()) as { images?: { front?: boolean; image: string; thumbnails?: Record<string, string> }[] };
-    const front = data.images?.find((i) => i.front) ?? data.images?.[0];
-    return (front?.thumbnails?.["500"] ?? front?.image ?? null)?.replace(/^http:\/\//, "https://") ?? null;
-  } catch {
-    return null;
-  }
-}
 
 async function main() {
   const cache = JSON.parse(readFileSync("prisma/data/semantic/musicbrainz.json", "utf8")) as Record<string, Resolution>;
@@ -74,7 +56,7 @@ async function main() {
     }
 
     if (!album.coverUrl) {
-      const url = (await coverFor(`release/${releaseMbid}`)) ?? (await coverFor(`release-group/${album.musicbrainzId}`));
+      const url = (await caaCover(`release/${releaseMbid}`)) ?? (await caaCover(`release-group/${album.musicbrainzId}`));
       if (url) {
         await prisma.album.update({ where: { id: album.id }, data: { coverUrl: url } });
         covers += 1;
