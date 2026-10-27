@@ -22,6 +22,16 @@ import { ShareToDmButton } from "@/components/share-to-dm-button";
 import { CustomCoverControl } from "@/components/custom-cover-control";
 import { applyCustomCovers, hasEntitlement } from "@/lib/entitlements";
 
+// Search links rather than exact IDs: the catalogue doesn't store streaming identifiers.
+function listenLinks(title: string, artist: string) {
+  const q = encodeURIComponent(`${artist} ${title}`);
+  return [
+    { label: "Spotify", href: `https://open.spotify.com/search/${q}` },
+    { label: "Apple Music", href: `https://music.apple.com/search?term=${q}` },
+    { label: "YouTube Music", href: `https://music.youtube.com/search?q=${q}` },
+  ];
+}
+
 function formatDuration(sec: number | null) {
   if (!sec) return "";
   const m = Math.floor(sec / 60);
@@ -57,16 +67,28 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="rounded-xl border border-border bg-surface p-5">
-        <div className="flex flex-col gap-6 sm:flex-row">
-          <div className="flex w-full max-w-[220px] shrink-0 flex-col gap-2">
-            <div className="relative aspect-square w-full">
+      <section className="relative isolate rounded-3xl border border-border bg-surface">
+        {album.coverUrl && (
+          <div aria-hidden="true" className="absolute inset-0 -z-10 overflow-hidden rounded-3xl">
+            <Image
+              src={album.coverUrl}
+              alt=""
+              fill
+              sizes="100vw"
+              className="scale-125 object-cover opacity-45 blur-3xl saturate-150 [[data-mode=light]_&]:opacity-30"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/75 to-surface/20" />
+          </div>
+        )}
+        <div className="flex flex-col gap-6 p-5 sm:flex-row sm:items-end sm:gap-8 sm:p-8">
+          <div className="flex w-full max-w-[260px] shrink-0 flex-col gap-2 self-center sm:self-auto">
+            <div className="relative aspect-square w-full drop-shadow-2xl">
               <TiltedCard
                 containerHeight="100%"
                 containerWidth="100%"
                 imageHeight="100%"
                 imageWidth="100%"
-                radius={12}
+                radius={14}
                 rotateAmplitude={10}
                 scaleOnHover={1.04}
                 showTooltip={false}
@@ -74,29 +96,57 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
                 gyroscope={false}
                 intro={false}
               >
-                <div className="absolute inset-0 rounded-xl bg-surface-2 ring-1 ring-inset ring-border" />
+                <div className="absolute inset-0 rounded-[14px] bg-surface-2 ring-1 ring-inset ring-border" />
                 {album.coverUrl && (
-                  <Image
-                    src={album.coverUrl}
-                    alt={album.title}
-                    fill
-                    priority
-                    sizes="220px"
-                    className="object-cover"
-                  />
+                  <Image src={album.coverUrl} alt={album.title} fill priority sizes="260px" className="object-cover" />
                 )}
               </TiltedCard>
             </div>
             {canCustomize && <CustomCoverControl albumId={album.id} hasCustomCover={hasCustomCover} />}
           </div>
 
-          <div className="flex flex-1 flex-col gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">
+                Album{album.releaseDate && ` · ${new Date(album.releaseDate).getFullYear()}`}
+              </p>
+              <h1 className="mt-1 text-3xl font-bold tracking-tight text-foreground sm:text-5xl">{album.title}</h1>
+              <Link
+                href={`/artist/${album.artistId}`}
+                className="mt-1 inline-block text-base font-medium text-foreground/80 hover:text-accent hover:underline"
+              >
+                {album.artist.name}
+              </Link>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+              <span className="flex items-center gap-2">
+                <StarRating value={avgRating} readOnly />
+                <span className="text-muted">
+                  {avgRating ? (
+                    <>
+                      <span className="font-semibold text-foreground">{avgRating.toFixed(1)}</span>
+                      {` · ${ratingCount} ${ratingCount === 1 ? "rating" : "ratings"}`}
+                    </>
+                  ) : (
+                    "No ratings yet"
+                  )}
+                </span>
+              </span>
+              {trackRatings.ratedTrackCount > 0 && (
+                <span className="text-xs text-muted">
+                  Tracks avg {trackRatings.albumTrackRating?.toFixed(1)}★ from {trackRatings.ratedTrackCount}{" "}
+                  {trackRatings.ratedTrackCount === 1 ? "song" : "songs"}
+                </span>
+              )}
+            </div>
+
             {album.genres.length > 0 && (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {album.genres.map(({ genre }) => (
                   <span
                     key={genre.id}
-                    className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted"
+                    className="rounded-full border border-border bg-background/50 px-2.5 py-0.5 text-[11px] font-medium text-muted backdrop-blur"
                   >
                     {genre.name}
                   </span>
@@ -104,71 +154,52 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
               </div>
             )}
 
-            <div>
-              <h1 className="text-2xl font-semibold sm:text-3xl">{album.title}</h1>
-              <p className="text-muted">
-                <Link
-                  href={`/artist/${album.artistId}`}
-                  className="hover:text-accent hover:underline"
-                >
-                  {album.artist.name}
-                </Link>
-                {album.releaseDate &&
-                  ` · Album: ${new Date(album.releaseDate).getFullYear()}`}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <StarRating value={avgRating} readOnly />
-              <span className="text-sm text-muted">
-                {avgRating ? avgRating.toFixed(1) : "No ratings yet"}
-                {ratingCount > 0 && ` (${ratingCount})`}
-              </span>
-            </div>
-
-            {trackRatings.ratedTrackCount > 0 && (
-              <div className="flex items-center gap-2">
-                <StarRating value={trackRatings.albumTrackRating} readOnly size="sm" />
-                <span className="text-xs text-muted">
-                  Track rating: {trackRatings.albumTrackRating?.toFixed(1)} (from{" "}
-                  {trackRatings.ratedTrackCount} rated{" "}
-                  {trackRatings.ratedTrackCount === 1 ? "song" : "songs"})
-                </span>
-              </div>
-            )}
-
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                disabled
-                title="Playback not available"
-                className="flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm text-muted opacity-70"
-              >
-                <Play size={14} />
-                Play Track
-              </button>
               {session?.user ? (
                 <>
                   <LogForm
                     albumId={album.id}
                     hasLoggedBefore={(userActivity?.timesLogged ?? 0) > 0}
                     defaultOpen={openLogForm}
+                    album={{ title: album.title, artist: album.artist.name, coverUrl: album.coverUrl }}
                   />
-                  <AddToListButton albumId={album.id} />
-                  <ShareToDmButton sharedAlbumId={album.id} label="Share with a friend" />
+                  <span className="flex items-center gap-1 rounded-full border border-border bg-background/60 px-3 py-1.5">
+                    <AddToListButton albumId={album.id} />
+                  </span>
+                  <span className="flex items-center gap-1 rounded-full border border-border bg-background/60 px-3 py-1.5">
+                    <ShareToDmButton sharedAlbumId={album.id} label="Share" />
+                  </span>
                 </>
               ) : (
                 <Link
                   href="/login"
-                  className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:opacity-90"
+                  className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-accent-foreground hover:opacity-90"
                 >
                   Log in to log this album
                 </Link>
               )}
             </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+              <span className="flex items-center gap-1">
+                <Play size={12} />
+                Listen on
+              </span>
+              {listenLinks(album.title, album.artist.name).map((l) => (
+                <a
+                  key={l.label}
+                  href={l.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full border border-border bg-background/40 px-2.5 py-1 transition-colors hover:border-accent hover:text-foreground"
+                >
+                  {l.label}
+                </a>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {userActivity && (

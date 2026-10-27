@@ -77,15 +77,15 @@ export function JournalEntryCard({
   }
 
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-border bg-surface p-3">
+    <div className="group flex items-start gap-3 rounded-2xl border border-border bg-surface p-3 transition-colors hover:border-accent/50">
       <Link href={`/album/${log.album.id}`} className="shrink-0">
-        <div className="relative h-14 w-14 overflow-hidden rounded-lg bg-surface-2 ring-1 ring-border">
+        <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-surface-2 ring-1 ring-border transition-transform group-hover:scale-[1.03]">
           {log.album.coverUrl && (
             <Image
               src={log.album.coverUrl}
               alt={log.album.title}
               fill
-              sizes="56px"
+              sizes="64px"
               className="object-cover"
             />
           )}

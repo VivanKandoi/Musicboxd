@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { searchCatalog } from "@/lib/queries";
 import { AlbumCard } from "@/components/album-card";
 import { UserListItem } from "@/components/user-list-item";
+import { Search } from "lucide-react";
+import { Kbd, PaletteButton } from "@/components/command-palette";
+import { EmptyState, buttonPrimary } from "@/components/ui/section";
 
 export default async function SearchPage({
   searchParams,
@@ -16,9 +19,19 @@ export default async function SearchPage({
     return (
       <div>
         <h1 className="mb-4 text-2xl font-semibold">Search</h1>
-        <p className="text-sm text-muted">
-          Search for an album, artist, or user using the search bar above.
-        </p>
+        <EmptyState
+          icon={Search}
+          title="Find an album, artist or person"
+          action={
+            <PaletteButton className={buttonPrimary}>
+              <Search size={15} />
+              Open search
+            </PaletteButton>
+          }
+        >
+          Press <Kbd>⌘K</Kbd> or <Kbd>/</Kbd> anywhere in MusicBoxd to search, and switch to log mode to log what
+          you&rsquo;re hearing.
+        </EmptyState>
       </div>
     );
   }
