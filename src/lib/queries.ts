@@ -294,16 +294,30 @@ export async function getAlbumRatingDistribution(albumId: string) {
   }));
 }
 
+// Imported streaming history (source "lastfm") is reported separately as plays: it isn't
+// something the user logged, and it never carries a rating or review.
 export async function getUserAlbumActivity(userId: string, albumId: string) {
-  const logs = await prisma.log.findMany({
-    where: { userId, albumId },
-    orderBy: { createdAt: "desc" },
-  });
+  const [logs, imported] = await Promise.all([
+    prisma.log.findMany({
+      where: { userId, albumId, source: "manual" },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.log.findMany({
+      where: { userId, albumId, source: "lastfm" },
+      select: { playCount: true, undated: true, listenedAt: true },
+    }),
+  ]);
+  const lastPlayed = imported
+    .filter((l) => !l.undated)
+    .reduce<Date | null>((latest, l) => (!latest || l.listenedAt > latest ? l.listenedAt : latest), null);
   return {
     timesLogged: logs.length,
     latestRating: logs[0]?.rating ?? null,
     latestNote: logs[0]?.reviewText ?? null,
     latestLoggedAt: logs[0]?.listenedAt ?? null,
+    lastfm: imported.length
+      ? { plays: imported.reduce((sum, l) => sum + (l.playCount ?? 1), 0), lastPlayed }
+      : null,
   };
 }
 

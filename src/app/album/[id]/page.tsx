@@ -157,13 +157,23 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
         {userActivity && (
           <div className="rounded-xl border border-border bg-surface p-5">
             <h2 className="mb-3 text-sm font-medium text-foreground">Your Log Activity</h2>
-            <div className="flex gap-8">
-              <div>
-                <p className="text-2xl font-semibold text-foreground">
-                  {userActivity.timesLogged}
-                </p>
-                <p className="text-xs text-muted">Times Logged</p>
-              </div>
+            <div className="flex flex-wrap gap-8">
+              {(userActivity.timesLogged > 0 || !userActivity.lastfm) && (
+                <div>
+                  <p className="text-2xl font-semibold text-foreground">
+                    {userActivity.timesLogged}
+                  </p>
+                  <p className="text-xs text-muted">Times Logged</p>
+                </div>
+              )}
+              {userActivity.lastfm && (
+                <div>
+                  <p className="text-2xl font-semibold text-foreground">
+                    {userActivity.lastfm.plays.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted">Plays on Last.fm</p>
+                </div>
+              )}
               <div>
                 <p className="flex items-center gap-1 text-2xl font-semibold text-foreground">
                   {userActivity.latestRating ? (
@@ -181,6 +191,20 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
             {userActivity.latestNote && (
               <p className="mt-3 border-t border-border pt-3 text-xs italic text-muted">
                 &ldquo;{userActivity.latestNote}&rdquo;
+              </p>
+            )}
+            {userActivity.lastfm && (
+              <p className="mt-3 border-t border-border pt-3 text-[11px] text-muted">
+                Play count imported from your Last.fm listening history
+                {userActivity.lastfm.lastPlayed
+                  ? ` · last played ${userActivity.lastfm.lastPlayed.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      timeZone: "UTC",
+                    })}`
+                  : ""}
+                . It isn&rsquo;t counted as a log.
               </p>
             )}
           </div>
