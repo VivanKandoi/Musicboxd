@@ -13,6 +13,9 @@ import { EditProfileForm } from "@/components/edit-profile-form";
 import { FiveFavesEditor } from "@/components/five-faves-editor";
 import { ActivityItem } from "@/components/activity-item";
 import { BadgesSection } from "@/components/badges-section";
+import { ThemedSpotlightCard } from "@/components/fx";
+import CountUp from "@/components/reactbits/CountUp";
+import TiltedCard from "@/components/reactbits/TiltedCard";
 
 export default async function ProfilePage({ params }: PageProps<"/u/[username]">) {
   const { username } = await params;
@@ -129,16 +132,31 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
           <div className="grid grid-cols-5 gap-3">
             {user.fiveFaves.map((f) => (
               <Link key={f.id} href={`/album/${f.album.id}`} className="group">
-                <div className="relative aspect-square overflow-hidden rounded-lg bg-surface-2 ring-1 ring-border group-hover:ring-accent">
-                  {f.album.coverUrl && (
-                    <Image
-                      src={f.album.coverUrl}
-                      alt={f.album.title}
-                      fill
-                      sizes="120px"
-                      className="object-cover"
-                    />
-                  )}
+                <div className="relative aspect-square">
+                  <TiltedCard
+                    containerHeight="100%"
+                    containerWidth="100%"
+                    imageHeight="100%"
+                    imageWidth="100%"
+                    radius={8}
+                    rotateAmplitude={14}
+                    scaleOnHover={1.06}
+                    showTooltip={false}
+                    flipOnClick={false}
+                    gyroscope={false}
+                    intro={false}
+                  >
+                    <div className="absolute inset-0 rounded-lg bg-surface-2 ring-1 ring-inset ring-border group-hover:ring-accent" />
+                    {f.album.coverUrl && (
+                      <Image
+                        src={f.album.coverUrl}
+                        alt={f.album.title}
+                        fill
+                        sizes="120px"
+                        className="object-cover"
+                      />
+                    )}
+                  </TiltedCard>
                 </div>
                 <p className="mt-1 truncate text-xs text-foreground">{f.album.title}</p>
               </Link>
@@ -154,7 +172,8 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
           <StatTile label="Unique albums" value={stats.albumsLogged} />
           <StatTile
             label="Avg rating given"
-            value={stats.avgRating ? stats.avgRating.toFixed(1) : "—"}
+            value={stats.avgRating ?? "—"}
+            decimals={1}
           />
           <StatTile label="Genres explored" value={stats.topGenres.length} />
         </div>
@@ -207,12 +226,14 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
   );
 }
 
-function StatTile({ label, value }: { label: string; value: string | number }) {
+function StatTile({ label, value, decimals = 0 }: { label: string; value: string | number; decimals?: number }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
-      <p className="text-2xl font-semibold text-foreground">{value}</p>
+    <ThemedSpotlightCard className="rounded-xl border border-border p-4">
+      <p className="text-2xl font-semibold text-foreground">
+        {typeof value === "number" ? <CountUp to={value} decimals={decimals} duration={1.2} separator="," /> : value}
+      </p>
       <p className="text-xs text-muted">{label}</p>
-    </div>
+    </ThemedSpotlightCard>
   );
 }
 

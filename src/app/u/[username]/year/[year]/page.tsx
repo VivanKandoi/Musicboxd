@@ -9,6 +9,10 @@ import { canViewProfileContent } from "@/lib/profile-access";
 import { getYearStats, getYearsWithListens } from "@/lib/year-in-review";
 import { getCoverOverrides } from "@/lib/entitlements";
 import { ShareYearButton } from "@/components/share-year-button";
+import { AccentAurora, ThemedSpotlightCard } from "@/components/fx";
+import AnimatedContent from "@/components/reactbits/AnimatedContent";
+import BlurText from "@/components/reactbits/BlurText";
+import CountUp from "@/components/reactbits/CountUp";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MONTH_NAMES = [
@@ -102,12 +106,20 @@ export default async function YearInReviewPage({ params }: PageProps<"/u/[userna
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="relative isolate flex flex-col gap-3 pt-4 sm:flex-row sm:items-end sm:justify-between">
+        <AccentAurora
+          opacity={0.5}
+          className="absolute -inset-x-4 -top-10 h-72 -z-10 sm:-inset-x-6"
+        />
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-accent">Year in review</p>
-          <h1 className="text-3xl font-semibold sm:text-4xl">
-            {displayName}&rsquo;s {year} in music
-          </h1>
+          <BlurText
+            as="h1"
+            text={`${displayName}\u2019s ${year} in music`}
+            delay={70}
+            animateBy="words"
+            className="text-3xl font-semibold sm:text-4xl"
+          />
         </div>
         <ShareYearButton username={user.username} year={year} />
       </div>
@@ -164,7 +176,7 @@ export default async function YearInReviewPage({ params }: PageProps<"/u/[userna
         </section>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <AnimatedContent stagger={0.12} distance={40} duration={0.7} className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-border bg-surface p-5">
           <h2 className="mb-3 text-sm font-medium text-foreground">Top artists</h2>
           <ol className="flex flex-col gap-2">
@@ -190,8 +202,9 @@ export default async function YearInReviewPage({ params }: PageProps<"/u/[userna
             ))}
           </div>
         </section>
-      </div>
+      </AnimatedContent>
 
+      <AnimatedContent distance={40} duration={0.7}>
       <section className="rounded-xl border border-border bg-surface p-5">
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-medium text-foreground">Your listening rhythm</h2>
@@ -225,8 +238,9 @@ export default async function YearInReviewPage({ params }: PageProps<"/u/[userna
           </p>
         )}
       </section>
+      </AnimatedContent>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <AnimatedContent stagger={0.12} distance={40} duration={0.7} className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-border bg-surface p-5">
           <h2 className="mb-1 text-sm font-medium text-foreground">How you rated</h2>
           <p className="mb-3 text-xs text-muted">
@@ -279,16 +293,18 @@ export default async function YearInReviewPage({ params }: PageProps<"/u/[userna
             </p>
           )}
         </section>
-      </div>
+      </AnimatedContent>
     </div>
   );
 }
 
 function BigStat({ value, label }: { value: number; label: string }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
-      <p className="text-3xl font-semibold text-foreground">{value.toLocaleString()}</p>
+    <ThemedSpotlightCard className="rounded-xl border border-border p-4">
+      <p className="text-3xl font-semibold text-foreground">
+        <CountUp to={value} duration={1.4} separator="," />
+      </p>
       <p className="text-xs text-muted">{label}</p>
-    </div>
+    </ThemedSpotlightCard>
   );
 }

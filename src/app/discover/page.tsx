@@ -7,6 +7,7 @@ import { applyCustomCovers } from "@/lib/entitlements";
 import { BENCHMARK_QUERIES } from "@/lib/semantic-queries";
 import { QUADRANTS, SYSTEMS, semanticCatalogSize, semanticSearch, type Quadrant, type SystemId } from "@/lib/semantic-search";
 import { loadSemanticTracks } from "@/lib/semantic-tracks";
+import { AccentAurora, AccentShinyText } from "@/components/fx";
 
 const DECADES = [1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010];
 const pct = (p: number) => `top ${Math.max(1, Math.round((1 - p) * 100))}%`;
@@ -37,18 +38,26 @@ export default async function DiscoverPage({ searchParams }: PageProps<"/discove
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold sm:text-3xl">Semantic Music Discovery</h1>
-      <p className="mb-6 text-sm text-muted">
-        Describe a feeling, a situation or a story. We match it against what {catalogSize.toLocaleString()} songs are
-        actually about.
-      </p>
+      <div className="relative isolate pb-6 pt-2">
+        <AccentAurora
+          opacity={0.45}
+          className="absolute -inset-x-4 -top-6 h-64 -z-10 sm:-inset-x-6"
+        />
+        <h1 className="text-2xl font-semibold sm:text-3xl">
+          <AccentShinyText text="Semantic Music Discovery" />
+        </h1>
+        <p className="text-sm text-muted">
+          Describe a feeling, a situation or a story. We match it against what {catalogSize.toLocaleString()} songs are
+          actually about.
+        </p>
+      </div>
 
       {catalogSize === 0 ? (
         <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted">
           The semantic catalogue hasn&rsquo;t been imported yet. Run <code>npm run semantic:import</code>.
         </p>
       ) : (
-        <Form action="/discover" className="rounded-xl border border-accent/50 bg-surface p-4">
+        <Form action="/discover" className="rounded-xl border border-accent/50 bg-surface/80 p-4 shadow-lg shadow-black/10 backdrop-blur-md">
           <div className="flex items-center gap-2 rounded-lg border border-accent/40 bg-background px-3 py-2.5">
             <Sparkles size={16} className="shrink-0 text-accent" />
             <input
@@ -151,7 +160,7 @@ export default async function DiscoverPage({ searchParams }: PageProps<"/discove
       )}
 
       <Link href="/guides" className="mt-6 flex items-center gap-1 text-sm text-accent hover:underline">
-        Prefer a guided tour? Browse the Start Here guides
+        Want to discover new genres? Explore our genre guides
         <ArrowRight size={14} />
       </Link>
     </div>

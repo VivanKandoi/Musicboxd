@@ -1,4 +1,5 @@
 import Image from "next/image";
+import TiltedCard from "@/components/reactbits/TiltedCard";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Play, Sparkles } from "lucide-react";
@@ -59,16 +60,32 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
       <div className="rounded-xl border border-border bg-surface p-5">
         <div className="flex flex-col gap-6 sm:flex-row">
           <div className="flex w-full max-w-[220px] shrink-0 flex-col gap-2">
-            <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-surface-2 ring-1 ring-border">
-              {album.coverUrl && (
-                <Image
-                  src={album.coverUrl}
-                  alt={album.title}
-                  fill
-                  sizes="220px"
-                  className="object-cover"
-                />
-              )}
+            <div className="relative aspect-square w-full">
+              <TiltedCard
+                containerHeight="100%"
+                containerWidth="100%"
+                imageHeight="100%"
+                imageWidth="100%"
+                radius={12}
+                rotateAmplitude={10}
+                scaleOnHover={1.04}
+                showTooltip={false}
+                flipOnClick={false}
+                gyroscope={false}
+                intro={false}
+              >
+                <div className="absolute inset-0 rounded-xl bg-surface-2 ring-1 ring-inset ring-border" />
+                {album.coverUrl && (
+                  <Image
+                    src={album.coverUrl}
+                    alt={album.title}
+                    fill
+                    priority
+                    sizes="220px"
+                    className="object-cover"
+                  />
+                )}
+              </TiltedCard>
             </div>
             {canCustomize && <CustomCoverControl albumId={album.id} hasCustomCover={hasCustomCover} />}
           </div>

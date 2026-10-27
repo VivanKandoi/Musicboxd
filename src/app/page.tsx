@@ -9,6 +9,8 @@ import { applyCustomCovers } from "@/lib/entitlements";
 import { AlbumCard } from "@/components/album-card";
 import { RecommendationCard } from "@/components/recommendation-card";
 import { OnThisDay } from "@/components/on-this-day";
+import { AccentAurora } from "@/components/fx";
+import BlurText from "@/components/reactbits/BlurText";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -40,11 +42,11 @@ export default async function HomePage() {
     const recentAlbums = await getRecentAlbums(12);
     return (
       <div>
-        <section className="flex flex-col items-start gap-4 py-10 sm:py-16">
+        <section className="relative isolate flex flex-col items-start gap-4 py-10 sm:py-16">
+          <AccentAurora className="absolute -inset-x-4 -top-6 h-80 -z-10 sm:-inset-x-6" />
           <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-            Log every listen.
-            <br />
-            <span className="text-accent">Build your taste.</span>
+            <BlurText as="span" text="Log every listen." delay={80} animateBy="words" />
+            <BlurText as="span" text="Build your taste." delay={80} animateBy="words" className="text-accent" />
           </h1>
           <p className="max-w-xl text-muted">
             MusicBoxd is a social home for music lovers — rate albums, write
@@ -102,9 +104,13 @@ export default async function HomePage() {
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold sm:text-3xl">
-            {greeting()}, {session.user.name || session.user.username}
-          </h1>
+          <BlurText
+            as="h1"
+            text={`${greeting()}, ${session.user.name || session.user.username}`}
+            delay={60}
+            animateBy="words"
+            className="text-2xl font-semibold sm:text-3xl"
+          />
           <p className="text-sm text-muted">
             Your sonic world is looking vibrant today.
           </p>
