@@ -188,6 +188,30 @@ export async function runLastfmImport(jobId: string) {
   }
 }
 
+// The user's imported library: one row per album with total plays and the latest dated play.
+export async function getImportedAlbums(userId: string) {
+  const listens = await prisma.log.findMany({
+    where: { userId, source: "lastfm" },
+    select: {
+      playCount: true,
+      undated: true,
+      listenedAt: true,
+      album: { select: { id: true, title: true, coverUrl: true, artist: { select: { name: true } } } },
+    },
+  });
+  const byAlbum = new Map<
+    string,
+    { album: (typeof listens)[number]["album"]; plays: number; lastPlayed: Date | null }
+  >();
+  for (const l of listens) {
+    const row = byAlbum.get(l.album.id) ?? { album: l.album, plays: 0, lastPlayed: null };
+    row.plays += l.playCount ?? 1;
+    if (!l.undated && (!row.lastPlayed || l.listenedAt > row.lastPlayed)) row.lastPlayed = l.listenedAt;
+    byAlbum.set(l.album.id, row);
+  }
+  return [...byAlbum.values()].sort((a, b) => b.plays - a.plays || a.album.title.localeCompare(b.album.title));
+}
+
 // A job whose process died (e.g. dev server restart) would otherwise stay "running" forever.
 const STALE_AFTER_MS = 15 * 60 * 1000;
 

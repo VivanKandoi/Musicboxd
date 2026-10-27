@@ -69,6 +69,15 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
     applyCustomCovers(session?.user?.id, user.fiveFaves, (f) => f.album),
     applyCustomCovers(session?.user?.id, diary ?? [], (log) => log.album),
   ]);
+  const importedAlbumCount = isOwnProfile
+    ? (
+        await prisma.log.findMany({
+          where: { userId: user.id, source: "lastfm" },
+          distinct: ["albumId"],
+          select: { albumId: true },
+        })
+      ).length
+    : 0;
 
   if (!canViewPrivateContent) {
     return (
@@ -160,6 +169,12 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
               </span>
             ))}
           </div>
+        )}
+        {importedAlbumCount > 0 && (
+          <Link href="/settings/import#imported" className="mt-3 inline-block text-xs text-accent hover:underline">
+            Includes {importedAlbumCount} {importedAlbumCount === 1 ? "album" : "albums"} imported from Last.fm ·
+            view list (only you can see this)
+          </Link>
         )}
       </section>
 
